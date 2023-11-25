@@ -1,22 +1,19 @@
 const { Level } = require('level')
 
-var path = require('path');
+let PATH = require('path');
 
 require('dotenv').config()
 
 
-var dbPath = path.join(process.env.DB_PATH, 'mydb');   
+let dbPath = PATH.join(process.env.DB_PATH, 'mydb');   
 
-console.log("dbPath",dbPath)
+let DB = new Level(dbPath);
 
-var db = new Level(dbPath);
 
-async function x(){
-   const value = await db.get('key 1')
-   console.log("value",value)   
+
+module.exports = {
+   DB,
+   LH_KEY:"lh"
 }
-
-
-x()
 
 

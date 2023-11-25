@@ -1,18 +1,18 @@
 const {Blockchain} = require('./blockchain')
+const {DB} = require("./db")
 
 
 
-
-function main(){
+async function main(){
    let blockchain = new Blockchain()
-   
-   blockchain.addBlock("First block after Genesis")
-   blockchain.addBlock("Second block after Genesis")
-   blockchain.addBlock("Third block after Genesis")
+  
+   await new Promise(resolve => setTimeout(resolve, 1000));
 
-   blockchain.Blocks.map(item=>{
-     console.log("item",item)
-   })
+  //  blockchain.addBlock("First block after Genesis")
+  //  blockchain.addBlock("Second block after Genesis")
+  //  blockchain.addBlock("Third block after Genesis")
+  
+   blockchain.iterate()
 }
 
 main()
