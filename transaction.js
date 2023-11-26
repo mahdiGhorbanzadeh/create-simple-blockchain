@@ -62,6 +62,19 @@ function canBeUnlocked(output,data){
     return output.PubKey == data
 }
 
+async function newTransaction(from,to,amount,blockchain){
+    let inputs = [];
+    let outputs = [];
+
+    let {acc,validOutputs} = await blockchain.findSpendableOutputs(from,amount)
+
+    if(acc < amount){
+        console.log("Error: not enough funds")
+    }else {
+        return tx
+    }
+}
+
 
 module.exports = {
     Transaction,

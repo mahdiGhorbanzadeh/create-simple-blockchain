@@ -69,6 +69,37 @@ class Blockchain {
 
     async findSpendableOutputs(address,amount){
 
+        let unspentOuts = {};
+
+        let unspentTxs = this.findUnspentTransactions(address);
+
+        let accumulated = 0;
+
+        unspentTxs.map(tx=>{
+            for (let i = 0; i < tx.TxOutputs.length; i++) {
+                if(CanBeUnlocked(tx.TxOutputs[i],address) 
+                    && accumulated < amount){
+                    accumulated += tx.TxOutputs[i].Value;
+
+                    if(unspentOuts[tx.ID]){
+                        unspentOuts[tx.ID].push(i) 
+                    }else{
+                        unspentOuts[tx.ID] = [i]    
+                    }
+
+                    if(accumulated>amount){
+                        break;
+                    }
+                }
+
+            }
+        })
+
+        return {
+            accumulated,
+            unspentOuts
+        }
+
     }
 
     async findUnspentTransactions(address){
