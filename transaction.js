@@ -71,6 +71,14 @@ async function newTransaction(from,to,amount,blockchain){
     if(acc < amount){
         console.log("Error: not enough funds")
     }else {
+
+        for (let i = 0; i < validOutputs.length; i++) {
+
+            for (let j = 0; j < validOutputs.length; j++) {
+                
+            }    
+        }
+        
         return tx
     }
 }
