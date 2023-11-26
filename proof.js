@@ -15,7 +15,7 @@ class Proof {
     }
 
     initData(nonce){
-        return this.block.PrevHash + this.block.Data + this.toHex(nonce) + this.toHex(this.difficulty)
+        return this.block.PrevHash + this.block.hashTransactions() + this.toHex(nonce) + this.toHex(this.difficulty)
     }
 
     run(){

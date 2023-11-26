@@ -2,20 +2,21 @@
 const {Block} = require('./block')
 const {Proof} = require("./proof")
 const {DB,LH_KEY} = require('./db')
-
+const {coinbaseTx,canBeUnlocked} = require("./transaction")
 class Blockchain {
     constructor(){
         this.initBlockchain()
     }
 
-    async initBlockchain(){
+    async initBlockchain(address){
         try{
             let res = await DB.get(LH_KEY)
             console.log("res",res)
             this.LastHash = res;
         }catch(e){
             if(e.code == "LEVEL_NOT_FOUND"){
-                let block = this.createBlock("Genesis",'');
+                cbtx = coinbaseTx(address,'')
+                let block = this.createBlock(cbtx,'');
                 console.log("block.Hash",block.Hash)
                 DB.put(block.Hash,this.serialize(block))
                 DB.put(LH_KEY,block.Hash)  
@@ -23,8 +24,8 @@ class Blockchain {
         }  
     }
 
-    createBlock(data,prevHash){
-        let block = new Block('',data,prevHash,0)
+    createBlock(txs,prevHash){
+        let block = new Block('',txs,prevHash,0)
         let pow = new Proof(block) 
         let res = pow.run()
 
@@ -50,6 +51,79 @@ class Blockchain {
       return JSON.parse(data)
     }
 
+    async findUTXO(address) {
+        let UTXOs = []
+
+        let unspentTxs = this.findUnspentTransactions(address)
+
+        for (let i = 0; i < unspentTxs.length; i++) {
+            unspentTxs[i].TxOutputs.map(item=>{
+               if(canBeUnlocked(item,address)){
+                  UTXOs.push(item)
+               }    
+            })
+        }
+
+        return UTXOs
+    }
+
+    async findSpendableOutputs(address,amount){
+
+    }
+
+    async findUnspentTransactions(address){
+        let currentHash = this.LastHash;
+
+        let unspentTxs = []
+        let spentTXOs = {}
+
+        while(true){
+            let block = this.deserialize(await DB.get(currentHash));
+            
+            block.Transactions.map(tx=>{
+                for (let i = 0; i < tx.TxOutputs.length; i++) {
+                    if(spentTXOs[tx.ID] != ''){
+
+                        let spendOuts = spentTXOs[tx.ID];
+
+                        for (let j = 0; j < spendOuts.length; j++) {
+                            if(spendOuts[j]==i){
+                                continue;
+                            }
+                        }
+                    }
+
+                    if(CanBeUnlocked(tx.TxOutputs[i],address)){
+                        unspentTxs.push(tx)
+                    }
+
+                }
+
+                if(!isCoinBaseTx(tx)){
+                    for (let j = 0; j < tx.TxInputs.length; j++) {
+                        let intxId = tx.TxInputs[j].ID
+                        
+                        if(spentTXOs[intxId]){
+                            spentTXOs[intxId].push(intxId) 
+                        }else{
+                            spentTXOs[intxId] = [intxId]    
+                        }
+                    }
+                }
+            })
+
+
+            
+            currentHash = block.PrevHash
+            
+            if(block.PrevHash == ''){
+                break;
+            }
+        }
+
+        return unspentTxs;
+    }
+
     async iterate(){
         let currentHash = this.LastHash;
         console.log("currentHash",currentHash)
@@ -66,6 +140,8 @@ class Blockchain {
         }
 
     }
+
+ 
 }
 
 module.exports = { Blockchain }
