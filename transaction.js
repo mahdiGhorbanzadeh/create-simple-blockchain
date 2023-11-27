@@ -72,12 +72,25 @@ async function newTransaction(from,to,amount,blockchain){
         console.log("Error: not enough funds")
     }else {
 
-        for (let i = 0; i < validOutputs.length; i++) {
+        let keys = Object.keys(validOutputs);
 
-            for (let j = 0; j < validOutputs.length; j++) {
-                
+        for (let i = 0; i < keys; i++) {
+            outs = keys[i];
+            for (let j = 0; j < outs; j++) {
+                inputs.push(new TxInput(keys[i],outs[j],from))
             }    
         }
+
+        outputs.push(new TxOutput({amount, to}))
+
+        if(acc>amount){
+            let returnAmount = acc - amount;
+            outputs.push(new TxOutput({returnAmount, from}))
+        }
+
+        let tx = new Transaction('',inputs,outputs)
+
+        tx.setID();
         
         return tx
     }
