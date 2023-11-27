@@ -28,7 +28,7 @@ class Transaction {
 
     setID(){
         let enCodeTx = JSON.stringify(this);
-        let hash = SHA256(enCodeTx)
+        let hash = sha256(enCodeTx)
         this.ID = hash;
     }
 
@@ -66,26 +66,30 @@ async function newTransaction(from,to,amount,blockchain){
     let inputs = [];
     let outputs = [];
 
-    let {acc,validOutputs} = await blockchain.findSpendableOutputs(from,amount)
-
-    if(acc < amount){
+    let {accumulated,unspentOuts} = await blockchain.findSpendableOutputs(from,amount)
+    
+    console.log("accumulated",accumulated)
+    console.log("unspentOuts",unspentOuts)
+    
+    if(accumulated < amount){
         console.log("Error: not enough funds")
     }else {
 
-        let keys = Object.keys(validOutputs);
+        let keys = Object.keys(unspentOuts);
 
-        for (let i = 0; i < keys; i++) {
-            outs = keys[i];
-            for (let j = 0; j < outs; j++) {
+        console.log("keys",keys)
+        for (let i = 0; i < keys.length; i++) {
+            outs = unspentOuts[keys[i]];
+            for (let j = 0; j < outs.length; j++) {
                 inputs.push(new TxInput(keys[i],outs[j],from))
             }    
         }
 
-        outputs.push(new TxOutput({amount, to}))
+        outputs.push(new TxOutput(amount, to))
 
-        if(acc>amount){
-            let returnAmount = acc - amount;
-            outputs.push(new TxOutput({returnAmount, from}))
+        if(accumulated>amount){
+            let returnAmount = accumulated - amount;
+            outputs.push(new TxOutput(returnAmount.toString(), from))
         }
 
         let tx = new Transaction('',inputs,outputs)
@@ -102,5 +106,6 @@ module.exports = {
     coinbaseTx,
     isCoinBaseTx,
     canUnlock,
-    canBeUnlocked
+    canBeUnlocked,
+    newTransaction
 }
