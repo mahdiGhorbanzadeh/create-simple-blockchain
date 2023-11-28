@@ -13,9 +13,14 @@ class Block {
         let hashes = [];
         let hash = ''
 
+        
         this.Transactions.map(item=>{
             hashes.push(item.ID);
         })
+
+
+        // console.log("hashes",hashes)
+
 
         hash = sha256(hashes)
         

@@ -2,21 +2,20 @@
 const {Block} = require('./block')
 const {Proof} = require("./proof")
 const {DB,LH_KEY} = require('./db')
-const {coinbaseTx,canBeUnlocked} = require("./transaction")
+const {coinbaseTx,canBeUnlocked,isCoinBaseTx} = require("./transaction")
 class Blockchain {
-    constructor(){
-        this.initBlockchain()
+    constructor(address){
+        this.initBlockchain(address)
     }
 
     async initBlockchain(address){
         try{
             let res = await DB.get(LH_KEY)
-            console.log("res",res)
             this.LastHash = res;
         }catch(e){
             if(e.code == "LEVEL_NOT_FOUND"){
-                cbtx = coinbaseTx(address,'')
-                let block = this.createBlock(cbtx,'');
+                let cbtx = coinbaseTx(address,'')
+                let block = this.createBlock([cbtx],'');
                 console.log("block.Hash",block.Hash)
                 DB.put(block.Hash,this.serialize(block))
                 DB.put(LH_KEY,block.Hash)  
@@ -54,7 +53,7 @@ class Blockchain {
     async findUTXO(address) {
         let UTXOs = []
 
-        let unspentTxs = this.findUnspentTransactions(address)
+        let unspentTxs = await this.findUnspentTransactions(address)
 
         for (let i = 0; i < unspentTxs.length; i++) {
             unspentTxs[i].TxOutputs.map(item=>{
@@ -71,15 +70,15 @@ class Blockchain {
 
         let unspentOuts = {};
 
-        let unspentTxs = this.findUnspentTransactions(address);
+        let unspentTxs = await this.findUnspentTransactions(address);
 
         let accumulated = 0;
 
         unspentTxs.map(tx=>{
             for (let i = 0; i < tx.TxOutputs.length; i++) {
-                if(CanBeUnlocked(tx.TxOutputs[i],address) 
-                    && accumulated < amount){
-                    accumulated += tx.TxOutputs[i].Value;
+                if(canBeUnlocked(tx.TxOutputs[i],address) 
+                    && accumulated < Number(amount)){
+                    accumulated += Number(tx.TxOutputs[i].Value);
 
                     if(unspentOuts[tx.ID]){
                         unspentOuts[tx.ID].push(i) 
@@ -87,7 +86,7 @@ class Blockchain {
                         unspentOuts[tx.ID] = [i]    
                     }
 
-                    if(accumulated>amount){
+                    if(accumulated>Number(amount)){
                         break;
                     }
                 }
@@ -113,9 +112,9 @@ class Blockchain {
             
             block.Transactions.map(tx=>{
                 for (let i = 0; i < tx.TxOutputs.length; i++) {
-                    if(spentTXOs[tx.ID] != ''){
-
-                        let spendOuts = spentTXOs[tx.ID];
+                    if(spentTXOs[tx.ID]){
+                        
+                        let spendOuts = spentTXOs[tx.ID]?spentTXOs[tx.ID]:[];
 
                         for (let j = 0; j < spendOuts.length; j++) {
                             if(spendOuts[j]==i){
@@ -124,7 +123,7 @@ class Blockchain {
                         }
                     }
 
-                    if(CanBeUnlocked(tx.TxOutputs[i],address)){
+                    if(canBeUnlocked(tx.TxOutputs[i],address)){
                         unspentTxs.push(tx)
                     }
 
@@ -160,9 +159,11 @@ class Blockchain {
         console.log("currentHash",currentHash)
         while(true){
             let block = this.deserialize(await DB.get(currentHash));
-            
-            console.log("block",block);
-            
+
+            console.log(".............................................");
+
+            console.log("Block",JSON.stringify(block,null,2));
+   
             currentHash = block.PrevHash
             
             if(block.PrevHash == ''){
