@@ -1,7 +1,7 @@
 const {Blockchain} = require('./blockchain')
 const {DB} = require("./db")
 const {newTransaction} = require("./transaction")
-
+const {Wallet} = require("./wallet")
 
 async function main(){
 
@@ -29,11 +29,15 @@ async function main(){
   //  blockchain.addBlock("Second block after Genesis")
   //  blockchain.addBlock("Third block after Genesis")
   
-   let x = await blockchain.findUTXO("mahdi")
+   // let x = await blockchain.findUTXO("mahdi")
 
-   console.log("x",x)
+   // console.log("x",x)
+
    
    // blockchain.iterate()
+
+   let wallet = new Wallet();
+   
 }
 
 main()
