@@ -1,19 +1,21 @@
 
-const {sha256} = require('js-sha256')
+const {sha256} = require('js-sha256');
+const { Wallet,generatePublicKeyHash, base58Decode } = require('./wallet');
 
 
 class TxOutput {
-    constructor(value,pubKey){
+    constructor(value,pubKeyHash){
         this.Value = value;
-        this.PubKey = pubKey;
+        this.PubKeyHash = pubKeyHash;
     }
 }
 
 class TxInput {
-    constructor(id,out,sig){
+    constructor(id,out,signature,pubKey){
         this.ID = id;
         this.Out = out;
-        this.Sig = sig;
+        this.Signature = signature;
+        this.PubKey = pubKey
     }
 }
 
@@ -26,10 +28,22 @@ class Transaction {
         this.TxOutputs = txOutputs;
     }
 
+    getHash(){
+      let txCopy = this;
+      txCopy.ID = '';
+      let hash = sha256(txCopy.serialize())
+
+      return hash;
+    }
+
     setID(){
         let enCodeTx = JSON.stringify(this);
         let hash = sha256(enCodeTx)
         this.ID = hash;
+    }
+
+    serialize(){
+        return JSON.stringify(this)
     }
 
 }
@@ -52,6 +66,43 @@ function coinbaseTx(to,data){
 
 function isCoinBaseTx(tx){
     return tx.TxInputs.length == 1 && tx.TxInputs[0].ID == 0  && tx.TxInputs[0].Out == -1;
+}
+
+function sign(tx,privKey,prevTXs){
+    if(isCoinBaseTx(tx)){
+        return
+    }
+
+    for(let i=0;i<tx.TxInputs.length;i++){
+        if(prevTXs[JSON.stringify(tx.TxInputs[i].ID)].ID == null){
+            console.log("previous transaction does not exist.")
+        }
+    }
+
+    let txCopy = tx.TrimmedCopy()
+
+    for (let i = 0; i < txCopy.TxInputs.length; i++) {
+        let prevTX = prevTXs[JSON.stringify(txCopy.TxInputs[id].ID)]
+        txCopy.TxInputs[i].Signature = '';
+        txCopy.TxInputs[i].PubKey = prevTX.TxOutputs[txCopy.TxInputs[].]
+    }
+}
+
+function usesKey(input,pubKeyHash){
+    let lockingHash = generatePublicKeyHash(input.PubKey);
+    return Buffer.compare(lockingHash,pubKeyHash); 
+}
+
+function lock(output,address){
+    let pubKeyHash = base58Decode(address);
+    pubKeyHash = pubKeyHash[1,pubKeyHash.length-4];
+    output.PubKeyHash = pubKeyHash;
+
+    return output;
+}
+
+function isLockedWithKey(output,pubKeyHash){
+   return Buffer.compare(output.PubKeyHash,pubKeyHash)==0
 }
 
 function canUnlock(input,data){

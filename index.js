@@ -37,7 +37,12 @@ async function main(){
    // blockchain.iterate()
 
    let wallet = new Wallet();
-   
+   let address = wallet.getAddress()
+
+   console.log("address",address)
+
+
+   wallet.validateAddress(address)
 }
 
 main()

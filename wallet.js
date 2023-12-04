@@ -96,13 +96,51 @@ class Wallet {
 
       let address = this.base58Encode(fullHash)
 
-      console.log("address",address)
-
       return address
+    }
+
+    validateAddress(address){
+      let publicKeyHash  = this.base58Decode(address)
+      
+      let actualChecksum = publicKeyHash.slice(publicKeyHash.length-4,publicKeyHash.length);
+
+      let version = publicKeyHash.slice(0,1);
+
+      publicKeyHash =  publicKeyHash.slice(1,publicKeyHash.length-4)
+
+      let targetCheckSum = this.generateCheckSum(Buffer.concat([version,publicKeyHash]))
+      
+      return Buffer.compare(actualChecksum,targetCheckSum) == 0
     }
     
 }
 
+function generatePublicKeyHash(publicKey){
+      
+  console.log("publicKey",publicKey)
+  
+  const publicKeyBuffer = Buffer.from(publicKey, 'hex');
+
+  console.log("publicKeyBuffer",publicKeyBuffer)
+    
+  const hash = crypto.createHash('sha256').update(publicKeyBuffer).digest();
+
+  const publicKeyHash = crypto.createHash('ripemd160').update(hash).digest();
+
+  return publicKeyHash;
+}
+
+function base58Encode(input){
+  return bs58.encode(input);
+}
+
+function base58Decode(input){
+  return bs58.decode(input);
+}
+
 module.exports = {
-  Wallet
+  Wallet,
+  generatePublicKeyHash,
+  base58Decode,
+  base58Encode
 }
