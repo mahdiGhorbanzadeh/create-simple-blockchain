@@ -1,6 +1,7 @@
 
 const {sha256} = require('js-sha256');
 const { Wallet,generatePublicKeyHash, base58Decode } = require('./wallet');
+const EC = require('elliptic').ec;
 
 
 class TxOutput {
@@ -64,6 +65,24 @@ function coinbaseTx(to,data){
     return tx;
 }
 
+function trimmedCopy(tx){
+    let txInputs = [];
+    let txOutputs = [];
+
+    for (let i = 0; i < tx.TxInputs.length; i++) {
+        txInputs.push(new TxInput(tx.TxInputs[i].ID,tx.TxInputs[i].Out,'',''))
+    }
+
+    for (let i = 0; i < tx.TxOutputs.length; i++) {
+        txOutputs.push(new TxOutput(tx.TxOutputs[i].Value,tx.TxOutputs[i].PubKeyHash))
+    }
+
+    let txCopy = new Transaction(tx.ID,txInputs,txOutputs)
+
+    return txCopy
+
+}
+
 function isCoinBaseTx(tx){
     return tx.TxInputs.length == 1 && tx.TxInputs[0].ID == 0  && tx.TxInputs[0].Out == -1;
 }
@@ -79,13 +98,65 @@ function sign(tx,privKey,prevTXs){
         }
     }
 
-    let txCopy = tx.TrimmedCopy()
+    let txCopy = trimmedCopy(tx)
 
     for (let i = 0; i < txCopy.TxInputs.length; i++) {
         let prevTX = prevTXs[JSON.stringify(txCopy.TxInputs[id].ID)]
         txCopy.TxInputs[i].Signature = '';
-        txCopy.TxInputs[i].PubKey = prevTX.TxOutputs[txCopy.TxInputs[].]
+        txCopy.TxInputs[i].PubKey = prevTX.TxOutputs[txCopy.TxInputs[i].Out].PubKeyHash;
+        txCopy.ID = txCopy.Hash()
+        txCopy.TxInputs[i].PubKey = ''
+        res = EC.sign(Math.random(),privKey,txCopy.ID)
+        
+        let signature = Buffer.concat([res.r,res.s])
+
+        tx.TxInputs[i].Signature = signature;
     }
+}
+
+
+function verify(tx,prevTXs){
+    if(isCoinBaseTx(tx)){
+        return
+    }
+
+    for(let i=0;i<tx.TxInputs.length;i++){
+        if(prevTXs[JSON.stringify(tx.TxInputs[i].ID)].ID == null){
+            console.log("previous transaction does not exist.")
+        }
+    }
+
+    let txCopy = trimmedCopy(tx)
+
+
+    for (let i = 0; i < txCopy.TxInputs.length; i++) {
+        let prevTX = prevTXs[JSON.stringify(txCopy.TxInputs[id].ID)]
+        txCopy.TxInputs[i].Signature = '';
+        txCopy.TxInputs[i].PubKey = prevTX.TxOutputs[txCopy.TxInputs[i].Out].PubKeyHash;
+        txCopy.ID = txCopy.Hash()
+        txCopy.TxInputs[i].PubKey = ''
+
+        let r,s;
+
+        sigLen = txCopy.TxInputs[i].Signature.length
+
+        r = txCopy.TxInputs[i].Signature.slice(0,sigLen/2)
+        s = txCopy.TxInputs[i].Signature.slice(sigLen/2,sigLen)
+
+        let x,y;
+
+        let keyLen = txCopy.TxInputs[i].PubKey.length
+
+        x = txCopy.TxInputs[i].PubKey.slice(0,keyLen/2)
+        y = txCopy.TxInputs[i].PubKey.slice(keyLen/2,keyLen)
+        
+        rawPubKey = EC.P
+
+        
+    }
+
+
+
 }
 
 function usesKey(input,pubKeyHash){
@@ -99,6 +170,12 @@ function lock(output,address){
     output.PubKeyHash = pubKeyHash;
 
     return output;
+}
+
+function newTxOutput(value,address){
+    let txo = new TxOutput(value,'');
+    txo = lock(txo,address);
+    return txo;
 }
 
 function isLockedWithKey(output,pubKeyHash){
