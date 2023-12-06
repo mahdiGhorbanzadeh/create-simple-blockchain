@@ -127,36 +127,31 @@ function verify(tx,prevTXs){
     }
 
     let txCopy = trimmedCopy(tx)
+    
+    let curve = new EC("p256")
 
 
     for (let i = 0; i < txCopy.TxInputs.length; i++) {
-        let prevTX = prevTXs[JSON.stringify(txCopy.TxInputs[id].ID)]
-        txCopy.TxInputs[i].Signature = '';
+        let prevTX = prevTXs[Buffer.from(txCopy.TxInputs[id].ID).toString('hex')]
+        txCopy.TxInputs[i].Signature = null;
         txCopy.TxInputs[i].PubKey = prevTX.TxOutputs[txCopy.TxInputs[i].Out].PubKeyHash;
-        txCopy.ID = txCopy.Hash()
-        txCopy.TxInputs[i].PubKey = ''
+        txCopy.ID = txCopy.getHash()
+        txCopy.TxInputs[i].PubKey = null;
+    
+        let signature = Buffer.from(txCopy.TxInputs[i].Signature);
 
-        let r,s;
+        let publicKey = {
+            x: Buffer.from(txCopy.TxInputs[i].pubKey.slice(0, txCopy.TxInputs[i].pubKey.length / 2)),
+            y: Buffer.from(txCopy.TxInputs[i].pubKey.slice(txCopy.TxInputs[i].pubKey.length / 2)),
+          };
 
-        sigLen = txCopy.TxInputs[i].Signature.length
-
-        r = txCopy.TxInputs[i].Signature.slice(0,sigLen/2)
-        s = txCopy.TxInputs[i].Signature.slice(sigLen/2,sigLen)
-
-        let x,y;
-
-        let keyLen = txCopy.TxInputs[i].PubKey.length
-
-        x = txCopy.TxInputs[i].PubKey.slice(0,keyLen/2)
-        y = txCopy.TxInputs[i].PubKey.slice(keyLen/2,keyLen)
-        
-        rawPubKey = EC.P
-
-        
+        let key = curve.keyFromPublic(publicKey, 'hex');
+        if (!key.verify(txCopy.ID, signature)) {
+        return false;
+        }
     }
 
-
-
+    return true
 }
 
 function usesKey(input,pubKeyHash){

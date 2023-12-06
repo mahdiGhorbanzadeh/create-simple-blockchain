@@ -154,6 +154,15 @@ class Blockchain {
         return unspentTxs;
     }
 
+    async signTransaction(tx,privKey){
+        let prevTXs = {}
+
+        for (let i = 0; i < tx.TxInputs.length; i++) {
+            
+            let prevTX = c
+        }
+    }
+
     async iterate(){
         let currentHash = this.LastHash;
         console.log("currentHash",currentHash)
