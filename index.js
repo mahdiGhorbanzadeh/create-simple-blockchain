@@ -2,6 +2,7 @@ const {Blockchain} = require('./blockchain')
 const {DB} = require("./db")
 const {newTransaction} = require("./transaction")
 const {Wallet} = require("./wallet")
+const { Wallets } = require('./wallets')
 
 async function main(){
 
@@ -36,13 +37,20 @@ async function main(){
    
    // blockchain.iterate()
 
-   let wallet = new Wallet();
-   let address = wallet.getAddress()
+   let wallets = new Wallets();
+   
+   // let address = wallets.addWallet()
 
-   console.log("address",address)
+   // console.log("address",address)
 
+   // let address2 = wallets.addWallet()
 
-   wallet.validateAddress(address)
+   // console.log("address2",address2)
+
+   wallets.loadFile()
+
+   console.log("wallets",JSON.stringify(wallets.wallets,null,2))
+
 }
 
 main()

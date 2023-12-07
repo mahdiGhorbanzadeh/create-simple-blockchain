@@ -16,6 +16,8 @@ class Wallets {
         let address =  wallet.getAddress();
         
         this.wallets[address] = wallet;
+
+        return address;
     }
 
     getWallet(address){
@@ -39,5 +41,5 @@ class Wallets {
 }
 
 module.exports = {
-    
+    Wallets
 }
