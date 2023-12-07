@@ -2,7 +2,8 @@
 const {Block} = require('./block')
 const {Proof} = require("./proof")
 const {DB,LH_KEY} = require('./db')
-const {coinbaseTx,canBeUnlocked,isCoinBaseTx} = require("./transaction")
+const {coinbaseTx,canBeUnlocked,isCoinBaseTx, sign, verify, usesKey, isLockedWithKey} = require("./transaction")
+const { sha256 } = require('bitcoinjs-lib/src/crypto')
 class Blockchain {
     constructor(address){
         this.initBlockchain(address)
@@ -50,14 +51,14 @@ class Blockchain {
       return JSON.parse(data)
     }
 
-    async findUTXO(address) {
+    async findUTXO(pubKeyHash) {
         let UTXOs = []
 
-        let unspentTxs = await this.findUnspentTransactions(address)
+        let unspentTxs = await this.findUnspentTransactions(pubKeyHash)
 
         for (let i = 0; i < unspentTxs.length; i++) {
             unspentTxs[i].TxOutputs.map(item=>{
-               if(canBeUnlocked(item,address)){
+               if(isLockedWithKey(item.pubKeyHash,pubKeyHash)){
                   UTXOs.push(item)
                }    
             })
@@ -66,17 +67,17 @@ class Blockchain {
         return UTXOs
     }
 
-    async findSpendableOutputs(address,amount){
+    async findSpendableOutputs(pubKeyHash,amount){
 
         let unspentOuts = {};
 
-        let unspentTxs = await this.findUnspentTransactions(address);
+        let unspentTxs = await this.findUnspentTransactions(pubKeyHash);
 
         let accumulated = 0;
 
         unspentTxs.map(tx=>{
             for (let i = 0; i < tx.TxOutputs.length; i++) {
-                if(canBeUnlocked(tx.TxOutputs[i],address) 
+                if(isLockedWithKey(tx.TxOutputs[i].pubKeyHash,pubKeyHash) 
                     && accumulated < Number(amount)){
                     accumulated += Number(tx.TxOutputs[i].Value);
 
@@ -101,7 +102,7 @@ class Blockchain {
 
     }
 
-    async findUnspentTransactions(address){
+    async findUnspentTransactions(pubKeyHash){
         let currentHash = this.LastHash;
 
         let unspentTxs = []
@@ -123,7 +124,7 @@ class Blockchain {
                         }
                     }
 
-                    if(canBeUnlocked(tx.TxOutputs[i],address)){
+                    if(isLockedWithKey(tx.TxOutputs[i],pubKeyHash)){
                         unspentTxs.push(tx)
                     }
 
@@ -133,7 +134,7 @@ class Blockchain {
                     for (let j = 0; j < tx.TxInputs.length; j++) {
                         let intxId = tx.TxInputs[j].ID
                         
-                        if(spentTXOs[intxId]){
+                        if(usesKey(tx.TxInputs[j],pubKeyHash)){
                             spentTXOs[intxId].push(intxId) 
                         }else{
                             spentTXOs[intxId] = [intxId]    
@@ -159,8 +160,55 @@ class Blockchain {
 
         for (let i = 0; i < tx.TxInputs.length; i++) {
             
-            let prevTX = c
+            let prevTX = this.findTransaction(tx.TxInputs[i].ID)
+
+            prevTXs[sha256(prevTX.ID)] = prevTX;
         }
+
+        sign(tx,privKey,prevTXs);
+    }
+
+    async verifyTransaction(tx){
+        let prevTXs = {}
+
+        for (let i = 0; i < tx.TxInputs.length; i++) {
+            
+            let prevTX = this.findTransaction(tx.TxInputs[i].ID)
+
+            prevTXs[sha256(prevTX.ID)] = prevTX;
+        }
+
+        return verify(tx,prevTXs)
+    }
+
+    async findTransaction(id){
+        let currentHash = this.LastHash;
+        let tx;
+        console.log("currentHash",currentHash)
+        
+        while(true){
+            let block = this.deserialize(await DB.get(currentHash));
+
+            console.log(".............................................");
+
+            block.Transactions.map(item=>{
+                if(item.ID==id){
+                    tx = item;
+                }
+            })
+
+            if(tx){
+                break;
+            }
+   
+            currentHash = block.PrevHash
+            
+            if(block.PrevHash == ''){
+                break;
+            }
+        }
+
+        return tx;
     }
 
     async iterate(){

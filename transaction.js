@@ -55,7 +55,7 @@ function coinbaseTx(to,data){
         data = `Coins to ${to}`
     }
     
-    let txin = new TxInput(0,-1,to);
+    let txin = new TxInput(0,-1,'',Buffer.from(data));
     let txout = new TxOutput(100,to);
     
 
@@ -189,10 +189,16 @@ async function newTransaction(from,to,amount,blockchain){
     let inputs = [];
     let outputs = [];
 
-    let {accumulated,unspentOuts} = await blockchain.findSpendableOutputs(from,amount)
+    let wallet = new Wallet()
+
+    let pubKeyHash = wallet.generatePublicKeyHash()
+
+    let {accumulated,unspentOuts} = await blockchain.findSpendableOutputs(pubKeyHash,amount)
     
     console.log("accumulated",accumulated)
     console.log("unspentOuts",unspentOuts)
+
+
     
     if(accumulated < amount){
         console.log("Error: not enough funds")
@@ -201,10 +207,11 @@ async function newTransaction(from,to,amount,blockchain){
         let keys = Object.keys(unspentOuts);
 
         console.log("keys",keys)
+
         for (let i = 0; i < keys.length; i++) {
             outs = unspentOuts[keys[i]];
             for (let j = 0; j < outs.length; j++) {
-                inputs.push(new TxInput(keys[i],outs[j],from))
+                inputs.push(new TxInput(keys[i],outs[j],'',wallet.PublicKey))
             }    
         }
 
@@ -217,7 +224,9 @@ async function newTransaction(from,to,amount,blockchain){
 
         let tx = new Transaction('',inputs,outputs)
 
-        tx.setID();
+        tx.ID = tx.Hash();
+
+        blockchain.signTransaction(tx,w.PrivateKey);
         
         return tx
     }
@@ -230,5 +239,9 @@ module.exports = {
     isCoinBaseTx,
     canUnlock,
     canBeUnlocked,
-    newTransaction
+    newTransaction,
+    sign,
+    verify,
+    usesKey,
+    isLockedWithKey
 }

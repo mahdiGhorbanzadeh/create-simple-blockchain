@@ -12,13 +12,7 @@ const VERSION = Buffer.from("00","hex");
 const walletFile = "wallet.data"
 class Wallet {
     
-    constructor(){
-        if(fs.existsSync(walletFile)){
-          this.loadWallet()
-        }else{
-          this.newKeyPair()
-        }
-    }
+    constructor(){}
 
     loadWallet(){
       fs.readFile(walletFile, (err, file) => {
@@ -30,9 +24,13 @@ class Wallet {
       })
     }
 
+    makeWallet(){
+      this.newKeyPair();
+    }
+
     newKeyPair(){
       // Create a new EC key pair
-      const ec = new EC('secp256k1');
+      const ec = new EC('p256');
       const key = ec.genKeyPair();
     
       // Get the private and public key in hex format
@@ -41,13 +39,6 @@ class Wallet {
 
       this.PrivateKey = privateKey;
       this.PublicKey = publicKey;
-
-      let wallet = {
-        PrivateKey:privateKey,
-        PublicKey:publicKey
-      }
-
-      fs.writeFile(walletFile, JSON.stringify(wallet), (err) => {})
     }
 
     generatePublicKeyHash(){
