@@ -1,7 +1,9 @@
 
 const {sha256} = require('js-sha256');
 const { Wallet,generatePublicKeyHash, base58Decode } = require('./wallet');
+const { Wallets } = require('./wallets');
 const EC = require('elliptic').ec;
+const crypto = require('crypto');
 
 
 class TxOutput {
@@ -39,7 +41,9 @@ class Transaction {
 
     setID(){
         let enCodeTx = JSON.stringify(this);
+        
         let hash = sha256(enCodeTx)
+        
         this.ID = hash;
     }
 
@@ -55,14 +59,15 @@ function coinbaseTx(to,data){
         data = `Coins to ${to}`
     }
     
-    let txin = new TxInput(0,-1,'',Buffer.from(data));
-    let txout = new TxOutput(100,to);
+    let txin = new TxInput(0,-1,'',Buffer.from(data).toString('hex'));
+    let txout = newTxOutput(100,to);
     
-
     let tx = new Transaction('',[txin],[txout])
 
     tx.setID();
+
     return tx;
+    
 }
 
 function trimmedCopy(tx){
@@ -89,28 +94,36 @@ function isCoinBaseTx(tx){
 
 function sign(tx,privKey,prevTXs){
     if(isCoinBaseTx(tx)){
-        return
+        return;
     }
 
     for(let i=0;i<tx.TxInputs.length;i++){
-        if(prevTXs[JSON.stringify(tx.TxInputs[i].ID)].ID == null){
-            console.log("previous transaction does not exist.")
+        if(prevTXs[tx.TxInputs[i].ID].ID == ''){
+            
+            console.error("previous transaction does not exist.")
+            
+            throw "previous transaction does not exist."
         }
     }
 
     let txCopy = trimmedCopy(tx)
 
     for (let i = 0; i < txCopy.TxInputs.length; i++) {
-        let prevTX = prevTXs[JSON.stringify(txCopy.TxInputs[id].ID)]
+
+        let prevTX = prevTXs[txCopy.TxInputs[i].ID]
         txCopy.TxInputs[i].Signature = '';
         txCopy.TxInputs[i].PubKey = prevTX.TxOutputs[txCopy.TxInputs[i].Out].PubKeyHash;
-        txCopy.ID = txCopy.Hash()
+        txCopy.ID = txCopy.getHash()
         txCopy.TxInputs[i].PubKey = ''
-        res = EC.sign(Math.random(),privKey,txCopy.ID)
         
-        let signature = Buffer.concat([res.r,res.s])
+        console.log("privKey",privKey,"id ",txCopy.ID)
 
-        tx.TxInputs[i].Signature = signature;
+        res = new EC('p256').sign(txCopy.ID,Buffer.from(privKey))
+        
+        let s = res.s.toString('hex');
+        let r = res.r.toString('hex');
+
+        tx.TxInputs[i].Signature = Buffer.concat([Buffer.from(r),Buffer.from(s)]).toString("hex");
     }
 }
 
@@ -121,7 +134,7 @@ function verify(tx,prevTXs){
     }
 
     for(let i=0;i<tx.TxInputs.length;i++){
-        if(prevTXs[JSON.stringify(tx.TxInputs[i].ID)].ID == null){
+        if(prevTXs[JSON.stringify(tx.TxInputs[i].ID)].ID == ''){
             console.log("previous transaction does not exist.")
         }
     }
@@ -138,7 +151,7 @@ function verify(tx,prevTXs){
         txCopy.ID = txCopy.getHash()
         txCopy.TxInputs[i].PubKey = null;
     
-        let signature = Buffer.from(txCopy.TxInputs[i].Signature);
+        let signature = Buffer.from(txCopy.TxInputs[i].Signature,"hex");
 
         let publicKey = {
             x: Buffer.from(txCopy.TxInputs[i].pubKey.slice(0, txCopy.TxInputs[i].pubKey.length / 2)),
@@ -161,8 +174,10 @@ function usesKey(input,pubKeyHash){
 
 function lock(output,address){
     let pubKeyHash = base58Decode(address);
-    pubKeyHash = pubKeyHash[1,pubKeyHash.length-4];
-    output.PubKeyHash = pubKeyHash;
+
+    pubKeyHash = pubKeyHash.slice(1,pubKeyHash.length-4);
+
+    output.PubKeyHash = pubKeyHash.toString('hex');
 
     return output;
 }
@@ -173,8 +188,8 @@ function newTxOutput(value,address){
     return txo;
 }
 
-function isLockedWithKey(output,pubKeyHash){
-   return Buffer.compare(output.PubKeyHash,pubKeyHash)==0
+function isLockedWithKey(output,pubKeyHash){   
+   return Buffer.compare(Buffer.from(output.PubKeyHash),Buffer.from(pubKeyHash)) == 0
 }
 
 function canUnlock(input,data){
@@ -189,15 +204,24 @@ async function newTransaction(from,to,amount,blockchain){
     let inputs = [];
     let outputs = [];
 
-    let wallet = new Wallet()
+    let wallets = new Wallets()
+
+    await wallets.loadFile();
+
+    let res = wallets.getWallet(from);
+
+    let wallet = new Wallet();
+
+    wallet.updateWallet(res.PublicKey,res.PrivateKey);
 
     let pubKeyHash = wallet.generatePublicKeyHash()
 
-    let {accumulated,unspentOuts} = await blockchain.findSpendableOutputs(pubKeyHash,amount)
+    console.log("pubKeyHash",pubKeyHash.toString('hex'))
+
+    let {accumulated,unspentOuts} = await blockchain.findSpendableOutputs(pubKeyHash.toString('hex'),amount)
     
     console.log("accumulated",accumulated)
     console.log("unspentOuts",unspentOuts)
-
 
     
     if(accumulated < amount){
@@ -215,18 +239,18 @@ async function newTransaction(from,to,amount,blockchain){
             }    
         }
 
-        outputs.push(new TxOutput(amount, to))
+        outputs.push(newTxOutput(amount.toString(), to))
 
         if(accumulated>amount){
             let returnAmount = accumulated - amount;
-            outputs.push(new TxOutput(returnAmount.toString(), from))
+            outputs.push(newTxOutput(returnAmount.toString(), from))
         }
 
         let tx = new Transaction('',inputs,outputs)
 
-        tx.ID = tx.Hash();
+        tx.ID = tx.getHash();
 
-        blockchain.signTransaction(tx,w.PrivateKey);
+        await blockchain.signTransaction(tx,wallet.PrivateKey);
         
         return tx
     }
@@ -243,5 +267,6 @@ module.exports = {
     sign,
     verify,
     usesKey,
-    isLockedWithKey
+    isLockedWithKey,
+    newTxOutput
 }

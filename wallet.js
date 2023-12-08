@@ -9,23 +9,17 @@ const CHECK_SUM_LENGTH = 4;
 
 const VERSION = Buffer.from("00","hex");
 
-const walletFile = "wallet.data"
 class Wallet {
     
     constructor(){}
 
-    loadWallet(){
-      fs.readFile(walletFile, (err, file) => {
-        let wallet = JSON.parse(file);
-        
-        this.PrivateKey = wallet.PrivateKey;
-        this.PublicKey = wallet.PublicKey;
-        
-      })
-    }
-
     makeWallet(){
       this.newKeyPair();
+    }
+    
+    updateWallet(publicKey,privateKey){
+      this.PrivateKey = privateKey;
+      this.PublicKey = publicKey;
     }
 
     newKeyPair(){
@@ -44,12 +38,8 @@ class Wallet {
     generatePublicKeyHash(){
       
       let publicKey = this.PublicKey;
-
-      console.log("publicKey",publicKey)
       
       const publicKeyBuffer = Buffer.from(publicKey, 'hex');
-
-      console.log("publicKeyBuffer",publicKeyBuffer)
         
       const hash = crypto.createHash('sha256').update(publicKeyBuffer).digest();
 
@@ -70,7 +60,7 @@ class Wallet {
     }
 
     base58Decode(input){
-      return bs58.decode(input);
+      return Buffer.from(bs58.decode(input));
     }
 
     
@@ -84,6 +74,8 @@ class Wallet {
       let checksum = this.generateCheckSum(versionedHash)
     
       let fullHash = Buffer.concat([versionedHash,checksum])
+
+      console.log("fullHash",fullHash)
 
       let address = this.base58Encode(fullHash)
 
@@ -122,11 +114,12 @@ function generatePublicKeyHash(publicKey){
 }
 
 function base58Encode(input){
-  return bs58.encode(input);
+  return Buffer.from(bs58.encode(input),"hex");
 }
 
 function base58Decode(input){
-  return bs58.decode(input);
+  console.log("input input input input",input)
+  return Buffer.from(bs58.decode(input),"hex");
 }
 
 module.exports = {

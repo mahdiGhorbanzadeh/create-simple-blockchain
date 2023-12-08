@@ -1,5 +1,6 @@
 
-const fs = require('fs');
+const fs = require('fs').promises; // Using fs.promises to access the promised-based fs functions
+
 const { Wallet } = require('./wallet');
 
 const walletFile = "wallet.data"
@@ -24,14 +25,15 @@ class Wallets {
         return this.wallets[address];
     }
 
-    loadFile(){
-        fs.readFile(walletFile, (err, file) => {
+    async loadFile(){
+        try {
+            const file = await fs.readFile(walletFile);
             let wallets = JSON.parse(file);
-            
-            console.log("wallets",wallets);
-            
-            this.wallets = wallets; 
-          })
+            this.wallets = wallets;            
+        } catch (error) {
+            console.log("error",error)
+        }
+
     }
 
     saveFile(){

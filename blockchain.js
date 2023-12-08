@@ -2,7 +2,7 @@
 const {Block} = require('./block')
 const {Proof} = require("./proof")
 const {DB,LH_KEY} = require('./db')
-const {coinbaseTx,canBeUnlocked,isCoinBaseTx, sign, verify, usesKey, isLockedWithKey} = require("./transaction")
+const {coinbaseTx,isCoinBaseTx, sign, verify, usesKey, isLockedWithKey} = require("./transaction")
 const { sha256 } = require('bitcoinjs-lib/src/crypto')
 class Blockchain {
     constructor(address){
@@ -12,6 +12,7 @@ class Blockchain {
     async initBlockchain(address){
         try{
             let res = await DB.get(LH_KEY)
+
             this.LastHash = res;
         }catch(e){
             if(e.code == "LEVEL_NOT_FOUND"){
@@ -37,7 +38,7 @@ class Blockchain {
 
     addBlock(data){
         let newBlock = this.createBlock(data,this.LastHash)
-        console.log("newBlock.Hash",newBlock.Hash)
+
         this.LastHash = newBlock.Hash
         DB.put(LH_KEY,newBlock.Hash)
         DB.put(newBlock.Hash,this.serialize(newBlock))
@@ -58,7 +59,7 @@ class Blockchain {
 
         for (let i = 0; i < unspentTxs.length; i++) {
             unspentTxs[i].TxOutputs.map(item=>{
-               if(isLockedWithKey(item.pubKeyHash,pubKeyHash)){
+               if(isLockedWithKey(item,pubKeyHash)){
                   UTXOs.push(item)
                }    
             })
@@ -77,7 +78,7 @@ class Blockchain {
 
         unspentTxs.map(tx=>{
             for (let i = 0; i < tx.TxOutputs.length; i++) {
-                if(isLockedWithKey(tx.TxOutputs[i].pubKeyHash,pubKeyHash) 
+                if(isLockedWithKey(tx.TxOutputs[i],pubKeyHash) 
                     && accumulated < Number(amount)){
                     accumulated += Number(tx.TxOutputs[i].Value);
 
@@ -103,14 +104,17 @@ class Blockchain {
     }
 
     async findUnspentTransactions(pubKeyHash){
-        let currentHash = this.LastHash;
 
+
+        let currentHash = this.LastHash;
+        
         let unspentTxs = []
+
         let spentTXOs = {}
 
         while(true){
             let block = this.deserialize(await DB.get(currentHash));
-            
+
             block.Transactions.map(tx=>{
                 for (let i = 0; i < tx.TxOutputs.length; i++) {
                     if(spentTXOs[tx.ID]){
@@ -160,9 +164,9 @@ class Blockchain {
 
         for (let i = 0; i < tx.TxInputs.length; i++) {
             
-            let prevTX = this.findTransaction(tx.TxInputs[i].ID)
+            let prevTX = await this.findTransaction(tx.TxInputs[i].ID)
 
-            prevTXs[sha256(prevTX.ID)] = prevTX;
+            prevTXs[prevTX.ID] = prevTX;
         }
 
         sign(tx,privKey,prevTXs);
@@ -175,7 +179,7 @@ class Blockchain {
             
             let prevTX = this.findTransaction(tx.TxInputs[i].ID)
 
-            prevTXs[sha256(prevTX.ID)] = prevTX;
+            prevTXs[prevTX.ID] = prevTX;
         }
 
         return verify(tx,prevTXs)
@@ -183,8 +187,8 @@ class Blockchain {
 
     async findTransaction(id){
         let currentHash = this.LastHash;
+
         let tx;
-        console.log("currentHash",currentHash)
         
         while(true){
             let block = this.deserialize(await DB.get(currentHash));

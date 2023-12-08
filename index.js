@@ -6,11 +6,32 @@ const { Wallets } = require('./wallets')
 
 async function main(){
 
-   let blockchain = new Blockchain("jonatan")
+   let address = "171WnfYxrM9VZv3e1m8Sd8RqWHvmfgGxTe";
+
+
+   let blockchain = new Blockchain(address);
   
    await new Promise(resolve => setTimeout(resolve, 1000));
 
+   // ------------------ create blockchain 
+
+   blockchain.initBlockchain(address);
+
+   await new Promise(resolve => setTimeout(resolve, 1000));
+
+   // blockchain.iterate();
+
+   let from = "171WnfYxrM9VZv3e1m8Sd8RqWHvmfgGxTe";
+
+   let to = "1Bycc4u6NZWwiCm2xUqZBjCv32qkQEBrkd";
+
+   let amount = 30;
+
+
+   let tx = await newTransaction(from, to, amount, blockchain);
    
+   console.log("txxxxxxxxxxxxxxxxxxxxxx",tx);
+
    // let tx = await newTransaction("jonatan","ali","50",blockchain)
 
    // blockchain.addBlock([tx])
@@ -37,7 +58,26 @@ async function main(){
    
    // blockchain.iterate()
 
-   let wallets = new Wallets();
+
+   //----------------------------------------
+
+   // let wallets = new Wallets()
+
+   // await wallets.loadFile()
+
+   // let my_wallet = wallets.getWallet(address)
+
+   // let wallet = new Wallet()
+
+   // wallet.updateWallet(my_wallet.PublicKey,my_wallet.PrivateKey);
+
+
+   // let hash = wallet.base58Decode("171WnfYxrM9VZv3e1m8Sd8RqWHvmfgGxTe")
+
+   // console.log("hash",hash)
+
+
+   // console.log("wallets",JSON.stringify(wallets.wallets,null,2))
    
    // let address = wallets.addWallet()
 
@@ -47,9 +87,13 @@ async function main(){
 
    // console.log("address2",address2)
 
-   wallets.loadFile()
+   // wallets.saveFile()
 
-   console.log("wallets",JSON.stringify(wallets.wallets,null,2))
+   //-----------------------------------------
+
+   // wallets.loadFile()
+
+   // console.log("wallets",JSON.stringify(wallets.wallets,null,2))
 
 }
 
