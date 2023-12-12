@@ -36,12 +36,24 @@ class Blockchain {
         return block;
     }
 
-    addBlock(data){
-        let newBlock = this.createBlock(data,this.LastHash)
+    async addBlock(txs){
 
-        this.LastHash = newBlock.Hash
-        DB.put(LH_KEY,newBlock.Hash)
-        DB.put(newBlock.Hash,this.serialize(newBlock))
+        for (let i = 0; i < txs.length; i++) {
+            if(await (this.verifyTransaction(txs[i]))!= true){
+                
+                console.error('Error in verify transaction')
+
+                throw "Error in verify transaction"
+            }
+        }
+
+        let newBlock = this.createBlock(txs,this.LastHash);
+
+        this.LastHash = newBlock.Hash;
+
+        DB.put(LH_KEY,newBlock.Hash);
+        
+        DB.put(newBlock.Hash,this.serialize(newBlock));
     }
 
     serialize(block){
@@ -177,8 +189,8 @@ class Blockchain {
 
         for (let i = 0; i < tx.TxInputs.length; i++) {
             
-            let prevTX = this.findTransaction(tx.TxInputs[i].ID)
-
+            let prevTX = await this.findTransaction(tx.TxInputs[i].ID)
+            
             prevTXs[prevTX.ID] = prevTX;
         }
 

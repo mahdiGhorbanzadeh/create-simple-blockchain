@@ -19,7 +19,7 @@ async function main(){
 
    await new Promise(resolve => setTimeout(resolve, 1000));
 
-   // blockchain.iterate();
+   
 
    let from = "171WnfYxrM9VZv3e1m8Sd8RqWHvmfgGxTe";
 
@@ -28,15 +28,23 @@ async function main(){
    let amount = 30;
 
 
-   let tx = await newTransaction(from, to, amount, blockchain);
    
-   console.log("txxxxxxxxxxxxxxxxxxxxxx",tx);
+
+   await new Promise(resolve => setTimeout(resolve, 1000));
+
+   // let tx = await newTransaction(from, to, amount, blockchain);
+
 
    // let tx = await newTransaction("jonatan","ali","50",blockchain)
 
-   // blockchain.addBlock([tx])
+   // await blockchain.addBlock([tx])
    
    // console.log("...............................................")
+
+   await new Promise(resolve => setTimeout(resolve, 1000));
+
+
+   blockchain.iterate();
 
    // let tx2 = await newTransaction("jonatan","mahdi","25",blockchain)
 

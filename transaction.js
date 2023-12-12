@@ -116,14 +116,12 @@ function sign(tx,privKey,prevTXs){
         txCopy.ID = txCopy.getHash()
         txCopy.TxInputs[i].PubKey = ''
         
-        console.log("privKey",privKey,"id ",txCopy.ID)
 
-        res = new EC('p256').sign(txCopy.ID,Buffer.from(privKey))
+        let key = new EC('p256').keyFromPrivate(privKey) 
+
+        res = key.sign(txCopy.ID)
         
-        let s = res.s.toString('hex');
-        let r = res.r.toString('hex');
-
-        tx.TxInputs[i].Signature = Buffer.concat([Buffer.from(r),Buffer.from(s)]).toString("hex");
+        tx.TxInputs[i].Signature = res.toDER('hex');
     }
 }
 
@@ -134,8 +132,9 @@ function verify(tx,prevTXs){
     }
 
     for(let i=0;i<tx.TxInputs.length;i++){
-        if(prevTXs[JSON.stringify(tx.TxInputs[i].ID)].ID == ''){
-            console.log("previous transaction does not exist.")
+        if(prevTXs[tx.TxInputs[i].ID].ID == ''){
+            console.error("previous transaction does not exist.")
+            throw 'previous transaction does not exist.'
         }
     }
 
@@ -144,23 +143,27 @@ function verify(tx,prevTXs){
     let curve = new EC("p256")
 
 
-    for (let i = 0; i < txCopy.TxInputs.length; i++) {
-        let prevTX = prevTXs[Buffer.from(txCopy.TxInputs[id].ID).toString('hex')]
-        txCopy.TxInputs[i].Signature = null;
-        txCopy.TxInputs[i].PubKey = prevTX.TxOutputs[txCopy.TxInputs[i].Out].PubKeyHash;
+    for (let i = 0; i < tx.TxInputs.length; i++) {
+        let prevTX = prevTXs[tx.TxInputs[i].ID]
+
+        txCopy.TxInputs[i].Signature = '';
+        
+        
+        txCopy.TxInputs[i].PubKey = prevTX.TxOutputs[tx.TxInputs[i].Out].PubKeyHash;
         txCopy.ID = txCopy.getHash()
-        txCopy.TxInputs[i].PubKey = null;
+        txCopy.TxInputs[i].PubKey = '';
     
-        let signature = Buffer.from(txCopy.TxInputs[i].Signature,"hex");
+        
+        let signatureHex = tx.TxInputs[i].Signature;
 
-        let publicKey = {
-            x: Buffer.from(txCopy.TxInputs[i].pubKey.slice(0, txCopy.TxInputs[i].pubKey.length / 2)),
-            y: Buffer.from(txCopy.TxInputs[i].pubKey.slice(txCopy.TxInputs[i].pubKey.length / 2)),
-          };
+        let signature = Buffer.from(signatureHex, 'hex');
 
-        let key = curve.keyFromPublic(publicKey, 'hex');
+
+        let key = curve.keyFromPublic(tx.TxInputs[i].PubKey,'hex')
+
+
         if (!key.verify(txCopy.ID, signature)) {
-        return false;
+            return false;
         }
     }
 
