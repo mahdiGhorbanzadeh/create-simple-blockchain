@@ -203,7 +203,7 @@ function canBeUnlocked(output,data){
     return output.PubKey == data
 }
 
-async function newTransaction(from,to,amount,blockchain){
+async function newTransaction(from,to,amount,UTXOSet){
     let inputs = [];
     let outputs = [];
 
@@ -221,7 +221,7 @@ async function newTransaction(from,to,amount,blockchain){
 
     console.log("pubKeyHash",pubKeyHash.toString('hex'))
 
-    let {accumulated,unspentOuts} = await blockchain.findSpendableOutputs(pubKeyHash.toString('hex'),amount)
+    let {accumulated,unspentOuts} = await UTXOSet.findSpendableOutputs(pubKeyHash.toString('hex'),amount)
     
     console.log("accumulated",accumulated)
     console.log("unspentOuts",unspentOuts)
@@ -232,8 +232,6 @@ async function newTransaction(from,to,amount,blockchain){
     }else {
 
         let keys = Object.keys(unspentOuts);
-
-        console.log("keys",keys)
 
         for (let i = 0; i < keys.length; i++) {
             outs = unspentOuts[keys[i]];
@@ -253,7 +251,7 @@ async function newTransaction(from,to,amount,blockchain){
 
         tx.ID = tx.getHash();
 
-        await blockchain.signTransaction(tx,wallet.PrivateKey);
+        await UTXOSet.blockchain.signTransaction(tx,wallet.PrivateKey);
         
         return tx
     }

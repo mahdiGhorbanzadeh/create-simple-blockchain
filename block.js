@@ -18,10 +18,6 @@ class Block {
             hashes.push(item.ID);
         })
 
-
-        // console.log("hashes",hashes)
-
-
         hash = sha256(hashes)
         
         return hash;

@@ -55,11 +55,7 @@ class UTXOSet {
       
       const txID = key.substring(this.utxoPrefix.length);
 
-      console.log("txID",txID);
-
       const outs = this.deserializeOutputs(value);
-
-      console.log("outs",outs);
 
       for (let outIdx = 0; outIdx < outs.length; outIdx++) {
         const out = outs[outIdx];
@@ -74,7 +70,7 @@ class UTXOSet {
       }
     }
 
-    console.l
+
     return UTXOs
   }
 
@@ -146,6 +142,23 @@ class UTXOSet {
     if (keysForDelete.length > 0) {
       await deleteKeys(keysForDelete);
     }
+  }
+
+  async update(block){
+
+    const batchOps = [];
+
+    for (let i = 0; i < block.Tranactions.length; i++) {
+      
+      const tx = block.Tranactions[i];
+
+      let final_key = this.utxoPrefix + tx.ID;
+
+      batchOps.push({ type: 'put', key:final_key, value: this.serializeOutputs(tx.TxOutputs) });
+    }
+
+    await DB.batch(batchOps);
+
   }
 
   deserializeOutputs(outputs){

@@ -7,7 +7,7 @@ const { Wallets } = require('./wallets')
 
 async function main(){
 
-   let address = "171WnfYxrM9VZv3e1m8Sd8RqWHvmfgGxTe";
+   let address = "1KjEwXdZPHk2od3ztmAJQenXWkLQtHm7YX";
 
 
    let blockchain = new Blockchain(address);
@@ -22,19 +22,20 @@ async function main(){
 
    
 
-   let from = "171WnfYxrM9VZv3e1m8Sd8RqWHvmfgGxTe";
+   let from = "1KjEwXdZPHk2od3ztmAJQenXWkLQtHm7YX";
 
-   let to = "1Bycc4u6NZWwiCm2xUqZBjCv32qkQEBrkd";
+   let to = "17nL68bqPqMTNPC8D8YXHmkwEUYbVresUh";
 
    let amount = 30;
 
 
    
 
-   await new Promise(resolve => setTimeout(resolve, 1000));
+   // await new Promise(resolve => setTimeout(resolve, 1000));
 
    // let tx = await newTransaction(from, to, amount, blockchain);
 
+   // console.log("tx",tx);
 
    // let tx = await newTransaction("jonatan","ali","50",blockchain)
 
@@ -49,11 +50,12 @@ async function main(){
 
    await new Promise(resolve => setTimeout(resolve, 1000));
 
-   let utxo = new UTXOSet(blockchain)
+   let utxo = new UTXOSet(blockchain);
 
-   let res = await utxo.findUTXO()
+   let res =  await utxo.findUTXO("cd6f5f0369f35bd8811c5b43e8fa26ad1eec7b61");
 
-   console.log("res",res)
+   console.log("res",res);
+
 
    // let tx2 = await newTransaction("jonatan","mahdi","25",blockchain)
 
@@ -93,8 +95,6 @@ async function main(){
 
    // console.log("hash",hash)
 
-
-   // console.log("wallets",JSON.stringify(wallets.wallets,null,2))
    
    // let address = wallets.addWallet()
 
