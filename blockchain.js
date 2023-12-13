@@ -80,6 +80,70 @@ class Blockchain {
         return UTXOs
     }
 
+    async findUTXODB(){
+        let currentHash = this.LastHash;
+        
+        let UTXOs = {}
+
+        let spentTXOs = {}
+
+        while(true){
+            let block = this.deserialize(await DB.get(currentHash));
+
+            block.Transactions.map(tx=>{
+                for (let i = 0; i < tx.TxOutputs.length; i++) {
+                    
+                    let fail = false;
+
+                    if(spentTXOs[tx.ID]){
+
+                        let spendOuts = spentTXOs[tx.ID];
+
+                        for (let j = 0; j < spendOuts.length; j++) {
+                            if(spendOuts[j]==i){
+                                fail = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if(fail){
+                        continue;
+                    }
+
+                    if(!UTXOs[tx.ID]){
+                        UTXOs[tx.ID]=[];
+                    }
+
+                    UTXOs[tx.ID].push(tx.TxOutputs[i]);
+                }
+
+                if(!isCoinBaseTx(tx)){
+                    for (let j = 0; j < tx.TxInputs.length; j++) {
+                        let intxId = tx.TxInputs[j].ID
+
+
+                        if(!spentTXOs[intxId]){
+                            spentTXOs[intxId]=[];
+                        }
+    
+                        spentTXOs[intxId].push(tx.TxInputs[j].Out) 
+                    }
+                }
+            })
+
+
+            
+            currentHash = block.PrevHash
+            
+            if(block.PrevHash == ''){
+                break;
+            }
+        }
+        
+        return UTXOs;
+    }
+
     async findSpendableOutputs(pubKeyHash,amount){
 
         let unspentOuts = {};

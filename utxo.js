@@ -1,4 +1,5 @@
-const {DB,LH_KEY} = require('./db')
+const {DB,LH_KEY} = require('./db');
+const { isLockedWithKey } = require('./transaction');
 
 
 class UTXOSet {
@@ -12,13 +13,13 @@ class UTXOSet {
     let accumulated = 0;
 
     // Use LevelDB iterator to traverse the database
-    const iterator = db.iterator({ gte: this.utxoPrefix });
+    const iterator = DB.iterator({ gte: this.utxoPrefix , lte: this.utxoPrefix + '\xff' });
 
-    for await (const { key, value } of iterator) {
+    for await (const [key, value] of iterator) {
       
       const txID = key.substring(this.utxoPrefix.length);
 
-      const outs = deserializeOutputs(value);
+      const outs = this.deserializeOutputs(value);
 
       for (let outIdx = 0; outIdx < outs.length; outIdx++) {
         const out = outs[outIdx];
@@ -48,14 +49,17 @@ class UTXOSet {
   async findUTXO(pubKeyHash) {
     let UTXOs = []
     
-    // Use LevelDB iterator to traverse the database
-    const iterator = db.iterator({ gte: this.utxoPrefix });
+    const iterator = DB.iterator({ gte: this.utxoPrefix , lte: this.utxoPrefix + '\xff' });
 
-    for await (const { key, value } of iterator) {
+    for await (const [key, value] of iterator) {
       
       const txID = key.substring(this.utxoPrefix.length);
 
-      const outs = deserializeOutputs(value);
+      console.log("txID",txID);
+
+      const outs = this.deserializeOutputs(value);
+
+      console.log("outs",outs);
 
       for (let outIdx = 0; outIdx < outs.length; outIdx++) {
         const out = outs[outIdx];
@@ -70,6 +74,7 @@ class UTXOSet {
       }
     }
 
+    console.l
     return UTXOs
   }
 
@@ -78,9 +83,9 @@ class UTXOSet {
     
     let counter = 0;
 
-    const iterator = db.iterator({ gte: this.utxoPrefix });
+    const iterator = DB.iterator({ gte: this.utxoPrefix, lte: this.utxoPrefix + '\xff' });
 
-    for await (const { key } of iterator) {
+    for await (const [key] of iterator) {
 
       if (!key.startsWith(utxoPrefix)) {
         throw "error key was not have prefix !!!!"
@@ -95,41 +100,37 @@ class UTXOSet {
 
   async reIndex() {
  
-    const UTXO = this.blockchain.findUTXO(); 
+    const utxos = await this.blockchain.findUTXODB(); 
   
-    // Delete existing keys with the given prefix
-    await deleteByPrefix(utxoPrefix);
-  
+    await this.deleteByPrefix(this.utxoPrefix);
     
     const batchOps = [];
 
-
-    for (let i = 0; i < UTXO.length; i++) {
-      const element = array[i];
+    for (const [key, value] of Object.entries(utxos)) {
       
+      let final_key = this.utxoPrefix + key;
+      
+      batchOps.push({ type: 'put', key:final_key, value: this.serializeOutputs(value) });
     }
   
-    for (const [txId, outs] of UTXO) {
-      const key = utxoPrefix + key;
-      batchOps.push({ type: 'put', key, value: serializeOutputs(outs) });
-    }
-  
-    await db.batch(batchOps);
+    await DB.batch(batchOps);
   }
 
 
   async deleteByPrefix(prefix) {
 
     const deleteKeys = async (keysForDelete) => {
-      await db.batch(keysForDelete.map(key => ({ type: 'del', key })));
+      await DB.batch(keysForDelete.map(key => ({ type: 'del', key })));
     };
   
     const collectSize = 100000;
     const keysForDelete = [];
+
   
-    const iterator = db.iterator({ gte: prefix });
-  
-    for await (const { key } of iterator) {
+    const iterator = DB.iterator({ gte: prefix, lte: prefix + '\xff' });
+    
+    for await (const [key, value] of iterator) {
+
       if (!key.startsWith(prefix)) {
         throw "error key was not have prefix !!!! (deleteByPrefix)"
       }
@@ -138,24 +139,27 @@ class UTXOSet {
   
       if (keysForDelete.length === collectSize) {
         await deleteKeys(keysForDelete);
-        keysForDelete.length = 0; // Reset the array
+        keysForDelete.length = 0;
       }
     }
-  
-    // Delete remaining keys
+
     if (keysForDelete.length > 0) {
       await deleteKeys(keysForDelete);
     }
   }
 
-
-
-
-
-
   deserializeOutputs(outputs){
     return JSON.parse(outputs)
   }
+
+  serializeOutputs(outputs){
+    return JSON.stringify(outputs)
+  }
   
+}
+
+
+module.exports = {
+  UTXOSet
 }
 

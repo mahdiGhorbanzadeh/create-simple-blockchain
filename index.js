@@ -1,6 +1,7 @@
 const {Blockchain} = require('./blockchain')
 const {DB} = require("./db")
 const {newTransaction} = require("./transaction")
+const { UTXOSet } = require('./utxo')
 const {Wallet} = require("./wallet")
 const { Wallets } = require('./wallets')
 
@@ -44,7 +45,15 @@ async function main(){
    await new Promise(resolve => setTimeout(resolve, 1000));
 
 
-   blockchain.iterate();
+   // blockchain.iterate();
+
+   await new Promise(resolve => setTimeout(resolve, 1000));
+
+   let utxo = new UTXOSet(blockchain)
+
+   let res = await utxo.findUTXO()
+
+   console.log("res",res)
 
    // let tx2 = await newTransaction("jonatan","mahdi","25",blockchain)
 
