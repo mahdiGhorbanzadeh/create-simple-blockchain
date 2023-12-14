@@ -17,6 +17,10 @@ class UTXOSet {
 
     for await (const [key, value] of iterator) {
       
+      console.log("key",key)
+
+      console.log("value",value)
+
       const txID = key.substring(this.utxoPrefix.length);
 
       const outs = this.deserializeOutputs(value);

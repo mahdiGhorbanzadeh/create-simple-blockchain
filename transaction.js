@@ -219,8 +219,6 @@ async function newTransaction(from,to,amount,UTXOSet){
 
     let pubKeyHash = wallet.generatePublicKeyHash()
 
-    console.log("pubKeyHash",pubKeyHash.toString('hex'))
-
     let {accumulated,unspentOuts} = await UTXOSet.findSpendableOutputs(pubKeyHash.toString('hex'),amount)
     
     console.log("accumulated",accumulated)

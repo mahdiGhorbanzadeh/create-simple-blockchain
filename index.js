@@ -33,9 +33,7 @@ async function main(){
 
    // await new Promise(resolve => setTimeout(resolve, 1000));
 
-   // let tx = await newTransaction(from, to, amount, blockchain);
 
-   // console.log("tx",tx);
 
    // let tx = await newTransaction("jonatan","ali","50",blockchain)
 
@@ -46,15 +44,21 @@ async function main(){
    await new Promise(resolve => setTimeout(resolve, 1000));
 
 
-   // blockchain.iterate();
+   blockchain.iterate();
 
    await new Promise(resolve => setTimeout(resolve, 1000));
 
    let utxo = new UTXOSet(blockchain);
 
-   let res =  await utxo.findUTXO("cd6f5f0369f35bd8811c5b43e8fa26ad1eec7b61");
+   await utxo.reIndex();
 
-   console.log("res",res);
+   await new Promise(resolve => setTimeout(resolve, 1000));
+
+   let tx = await newTransaction(from, to, amount, utxo);
+
+   console.log("tx",tx);
+
+
 
 
    // let tx2 = await newTransaction("jonatan","mahdi","25",blockchain)
@@ -114,4 +118,36 @@ async function main(){
 
 }
 
-main()
+
+async function createWallet(){
+   let wallets = new Wallets()
+
+   let address = wallets.addWallet()
+
+   console.log("address",address)
+
+   let address2 = wallets.addWallet()
+
+   console.log("address2",address2)
+
+   wallets.saveFile()
+}
+
+async function createBlockChain(){
+
+   let wallets = new Wallets()
+
+   await wallets.loadFile()
+
+   let address = wallets.wallets[0]
+
+
+   // let blockchain = new Blockchain(address);
+
+
+}
+
+
+createWallet();
+
+// main()
