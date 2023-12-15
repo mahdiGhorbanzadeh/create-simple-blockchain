@@ -50,6 +50,26 @@ class UTXOSet {
   }
 
 
+  async getBalance(pubKeyHash){
+    
+    let utxos = await this.findUTXO(pubKeyHash);
+      
+    let amount = 0;
+    
+    for await (const [key, value] of Object.entries(utxos)) {
+      // console.log("this.utxoPrefix + key",this.utxoPrefix + key)
+      let utxo = this.deserializeOutputs(await DB.get(this.utxoPrefix + key))
+      
+      for (let i = 0; i < value.length; i++) {
+        amount += Number(utxo[value[i]].Value)
+      }
+
+    }
+
+    return amount;
+  }
+
+
   async findUTXO(pubKeyHash) {
     let UTXOs = []
     
@@ -77,7 +97,6 @@ class UTXOSet {
 
     return UTXOs
   }
-
 
   async countTransactions(){
     

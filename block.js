@@ -1,5 +1,6 @@
 
-const {sha256} = require('js-sha256')
+const {sha256} = require('js-sha256');
+const { newMerkleTree } = require('./merkle');
 
 class Block {
     constructor(Hash,Transactions,PrevHash,Nonce){
@@ -18,7 +19,7 @@ class Block {
             hashes.push(item.ID);
         })
 
-        hash = sha256(hashes)
+        let tree = newMerkleTree(hashes);
         
         return hash;
     }

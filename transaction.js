@@ -39,14 +39,6 @@ class Transaction {
       return hash;
     }
 
-    setID(){
-        let enCodeTx = JSON.stringify(this);
-        
-        let hash = sha256(enCodeTx)
-        
-        this.ID = hash;
-    }
-
     serialize(){
         return JSON.stringify(this)
     }
@@ -56,18 +48,18 @@ class Transaction {
 
 function coinbaseTx(to,data){
     if(!data){
-        data = `Coins to ${to}`
+        const randomBytes = crypto.randomBytes(24);
+        data = randomBytes.toString('hex');
     }
     
     let txin = new TxInput(0,-1,'',Buffer.from(data).toString('hex'));
-    let txout = newTxOutput(100,to);
+    let txout = newTxOutput(20,to);
     
     let tx = new Transaction('',[txin],[txout])
 
-    tx.setID();
+    tx.ID = tx.getHash()
 
     return tx;
-    
 }
 
 function trimmedCopy(tx){
@@ -203,6 +195,25 @@ function canBeUnlocked(output,data){
     return output.PubKey == data
 }
 
+async function getBalance(address,UTXOSet){
+
+    let wallets = new Wallets()
+
+    await wallets.loadFile();
+
+    let res = wallets.getWallet(address);
+
+    let wallet = new Wallet();
+
+    wallet.updateWallet(res.PublicKey,res.PrivateKey);
+
+    let pubKeyHash = wallet.generatePublicKeyHash()
+
+    let balance = await UTXOSet.getBalance(pubKeyHash.toString('hex'))
+
+    return balance;
+}
+
 async function newTransaction(from,to,amount,UTXOSet){
     let inputs = [];
     let outputs = [];
@@ -227,6 +238,7 @@ async function newTransaction(from,to,amount,UTXOSet){
     
     if(accumulated < amount){
         console.log("Error: not enough funds")
+        throw "Error: not enough funds";
     }else {
 
         let keys = Object.keys(unspentOuts);
@@ -267,5 +279,6 @@ module.exports = {
     verify,
     usesKey,
     isLockedWithKey,
-    newTxOutput
+    newTxOutput,
+    getBalance
 }

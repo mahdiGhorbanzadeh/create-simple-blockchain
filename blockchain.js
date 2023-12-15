@@ -7,6 +7,7 @@ const { sha256 } = require('bitcoinjs-lib/src/crypto')
 class Blockchain {
     constructor(address){
         this.initBlockchain(address)
+        this.Miner = address;
     }
 
     async initBlockchain(address){
@@ -39,7 +40,7 @@ class Blockchain {
     async addBlock(txs){
 
         for (let i = 0; i < txs.length; i++) {
-            if(await (this.verifyTransaction(txs[i]))!= true){
+            if(await (this.verifyTransaction(txs[i])) != true){
                 
                 console.error('Error in verify transaction')
 
@@ -47,7 +48,9 @@ class Blockchain {
             }
         }
 
-        let newBlock = this.createBlock(txs,this.LastHash);
+        let tx = coinbaseTx(this.Miner,"");
+
+        let newBlock = this.createBlock([tx,...txs],this.LastHash);
 
         this.LastHash = newBlock.Hash;
 
@@ -249,6 +252,10 @@ class Blockchain {
     }
 
     async verifyTransaction(tx){
+
+        if(isCoinBaseTx(tx)){
+           return true; 
+        }
         let prevTXs = {}
 
         for (let i = 0; i < tx.TxInputs.length; i++) {

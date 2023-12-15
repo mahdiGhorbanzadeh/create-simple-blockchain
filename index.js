@@ -1,6 +1,6 @@
 const {Blockchain} = require('./blockchain')
 const {DB} = require("./db")
-const {newTransaction} = require("./transaction")
+const {newTransaction, getBalance, coinbaseTx} = require("./transaction")
 const { UTXOSet } = require('./utxo')
 const {Wallet} = require("./wallet")
 const { Wallets } = require('./wallets')
@@ -133,21 +133,96 @@ async function createWallet(){
    wallets.saveFile()
 }
 
-async function createBlockChain(){
+async function createBlockChain(iterate = true){
 
    let wallets = new Wallets()
 
    await wallets.loadFile()
 
-   let address = wallets.wallets[0]
+   let address = "1JGDVKFjy1uvwc9nTQVw9c711CXhx2Fm86"
 
 
-   // let blockchain = new Blockchain(address);
+   let blockchain = new Blockchain(address);
 
+   await new Promise(resolve => setTimeout(resolve, 1000));
 
+   await blockchain.initBlockchain(address);
+
+   if(iterate){
+      await blockchain.iterate()
+   }
+
+   return blockchain
+}
+
+let transactions = [];
+
+async function createTransactionDB(reset=true){
+
+   if(reset){
+      transactions=[]
+   }
+
+   let wallets = new Wallets()
+
+   await wallets.loadFile()
+
+   let blockchain = await createBlockChain(false);
+   
+   
+   let utxo = new UTXOSet(blockchain);
+
+   await utxo.reIndex();
+
+   let from = "1JGDVKFjy1uvwc9nTQVw9c711CXhx2Fm86";
+
+   let to = "15vAVgu6MPKtqUjJYycqgfwN3HqXChnwxH";
+
+   let amount = 5;
+
+   let tx = await newTransaction(from, to, amount, utxo);
+
+   console.log("tx",tx);
+
+   transactions.push(tx)
+}
+
+async function createBlock(){
+   
+   console.log("transactions",transactions);
+
+   let blockchain = await createBlockChain(false);
+
+   blockchain.addBlock(transactions)
+}
+
+async function getBalanceUser(){
+   let address = '1JGDVKFjy1uvwc9nTQVw9c711CXhx2Fm86'
+   
+   let blockchain = await createBlockChain(false);
+   
+   let utxo = new UTXOSet(blockchain);
+
+   let balance = await getBalance(address,utxo);
+
+   console.log("user ",address , "  balance is  ",balance);
+}
+
+async function main2(){
+   // await createBlockChain();
+   await createTransactionDB();
+   await createBlock();
 }
 
 
-createWallet();
+getBalanceUser()
+
+// createWallet();
+
+createBlockChain();
+
+// createTransactionDB();
+
+// main2();
 
 // main()
