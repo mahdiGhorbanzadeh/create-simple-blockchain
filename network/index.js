@@ -140,6 +140,13 @@ function sendInv(address, kind, items) {
   sendData(address, request); 
 }
 
+function sendGetData(address, kind, id) {
+  const payload = GobEncode({ nodeAddress, kind, id });
+  const request = Buffer.concat([cmdToBytes('getdata'), payload]);
+
+  sendData(address, request);
+}
+
 function sendGetBlocks(address) {
   const payload = JSON.stringify({ AddrFrom: nodeAddress });
   const request = Buffer.concat([
@@ -211,7 +218,7 @@ function handleBlock(request, chain) {
 
   if (blocksInTransit.length > 0) {
     const blockHash = blocksInTransit[0];
-    SendGetData(payload.AddrFrom, "block", blockHash);
+    sendGetData(payload.AddrFrom, "block", blockHash);
 
     blocksInTransit = blocksInTransit.slice(1); 
   } else {
@@ -231,7 +238,7 @@ function handleInv(request, chain) {
     blocksInTransit = payload.Items;
 
     const blockHash = payload.Items[0];
-    SendGetData(payload.AddrFrom, 'block', blockHash); 
+    sendGetData(payload.AddrFrom, 'block', blockHash); 
 
     const newInTransit = blocksInTransit.filter(b => !Buffer.from(b).equals(Buffer.from(blockHash)));
     blocksInTransit = newInTransit;
@@ -241,7 +248,7 @@ function handleInv(request, chain) {
     const txID = payload.Items[0];
 
     if (!memoryPool[txID]) {
-      SendGetData(payload.AddrFrom, 'tx', txID); 
+      sendGetData(payload.AddrFrom, 'tx', txID); 
     }
   }
 }
@@ -251,7 +258,7 @@ function handleGetBlocks(request, chain) {
 
   const payload = JSON.parse(request.slice(commandLength).toString());
 
-  const blocks = chain.GetBlockHashes(); 
+  const blocks = chain.getBlockHashes(); 
   
   sendInv(payload.AddrFrom, "block", blocks); 
 }
@@ -262,7 +269,7 @@ function handleGetData(request, chain) {
   const payload = JSON.parse(request.slice(commandLength).toString()); 
 
   if (payload.Type === "block") {
-    chain.GetBlock(Buffer.from(payload.ID)) 
+    chain.getBlock(Buffer.from(payload.ID)) 
       .then(block => {
         SendBlock(payload.AddrFrom, block); 
       })
@@ -286,9 +293,9 @@ function handleGetData(request, chain) {
 function handleTx(request, chain) {
   const commandLength = 12; 
 
-  const payload = JSON.parse(request.slice(commandLength).toString()); // Assuming payload is in JSON format
+  const payload = JSON.parse(request.slice(commandLength).toString()); 
 
-  const tx = blockchain.DeserializeTransaction(payload.Transaction); // Deserialize transaction data
+  const tx = blockchain.DeserializeTransaction(payload.Transaction);
   memoryPool[Buffer.from(tx.ID).toString('hex')] = tx; 
   
   console.log(`${nodeAddress}, ${Object.keys(memoryPool).length}`);
