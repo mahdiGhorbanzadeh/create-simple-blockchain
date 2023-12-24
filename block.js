@@ -3,11 +3,13 @@ const {sha256} = require('js-sha256');
 const { newMerkleTree } = require('./merkle');
 
 class Block {
-    constructor(Hash,Transactions,PrevHash,Nonce){
+    constructor(Timestamp,Hash,Transactions,PrevHash,Nonce,Height){
+        this.Timestamp = Timestamp;
         this.Hash = Hash;
         this.Transactions = Transactions;
         this.PrevHash =PrevHash;
         this.Nonce = Nonce; 
+        this.Height = Height;
     }
 
     hashTransactions(){

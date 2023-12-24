@@ -142,7 +142,7 @@ async function createBlockChain(iterate = true){
    let address = "1JGDVKFjy1uvwc9nTQVw9c711CXhx2Fm86"
 
 
-   let blockchain = new Blockchain(address);
+   let blockchain = new Blockchain(address,"4000");
 
    await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -214,8 +214,7 @@ async function main2(){
    await createBlock();
 }
 
-
-getBalanceUser()
+// getBalanceUser()
 
 // createWallet();
 

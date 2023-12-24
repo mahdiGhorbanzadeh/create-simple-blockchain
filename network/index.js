@@ -157,7 +157,7 @@ function sendGetBlocks(address) {
   sendData(address, request);
 }
 
-function SendTx(addr, tnx) {
+function sendTx(addr, tnx) {
   const serializedTx = tnx.Serialize(); 
 
   const data = {
@@ -283,7 +283,7 @@ function handleGetData(request, chain) {
     const tx = memoryPool[txID];
 
     if (tx) {
-      SendTx(payload.AddrFrom, tx); 
+      sendTx(payload.AddrFrom, tx); 
     } else {
       console.error(`Transaction ${txID} not found in memory pool`);
     }
@@ -332,7 +332,7 @@ async function mineTx(chain) {
   const cbTx = blockchain.CoinbaseTx(mineAddress, "");
   txs.push(cbTx);
 
-  const newBlock = await chain.MineBlock(txs);
+  const newBlock = await chain.mineBlock(txs);
   const UTXOSet = new blockchain.UTXOSet(chain);
   await UTXOSet.Reindex();
 
@@ -404,7 +404,7 @@ function handleConnection(data, chain) {
 }
 
 const startServer = (nodeID, minerAddress) => {
-  nodeAddress = `localhost:${nodeID}`;
+  nodeAddress = `http://localhost:${nodeID}`;
   mineAddress = minerAddress;
 
   const server = net.createServer((socket) => {
@@ -461,4 +461,10 @@ function closeDB(chain) {
 
   process.on('SIGINT', cleanupFunction);
   process.on('SIGTERM', cleanupFunction);
+}
+
+module.exports = {
+  startServer,
+  sendTx,
+  KnownNodes
 }

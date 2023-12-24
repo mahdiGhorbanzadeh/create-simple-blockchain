@@ -82,8 +82,8 @@ class Wallet {
       return address
     }
 
-    validateAddress(address){
-      let publicKeyHash  = this.base58Decode(address)
+    static validateAddress(address){
+      let publicKeyHash  = base58Decode(address)
       
       let actualChecksum = publicKeyHash.slice(publicKeyHash.length-4,publicKeyHash.length);
 
@@ -91,7 +91,7 @@ class Wallet {
 
       publicKeyHash =  publicKeyHash.slice(1,publicKeyHash.length-4)
 
-      let targetCheckSum = this.generateCheckSum(Buffer.concat([version,publicKeyHash]))
+      let targetCheckSum = generateCheckSum(Buffer.concat([version,publicKeyHash]))
       
       return Buffer.compare(actualChecksum,targetCheckSum) == 0
     }
@@ -111,6 +111,14 @@ function generatePublicKeyHash(publicKey){
   const publicKeyHash = crypto.createHash('ripemd160').update(hash).digest();
 
   return publicKeyHash;
+}
+
+
+function generateCheckSum(payload){
+  const hashOnce = crypto.createHash('sha256').update(payload).digest();
+  const hashTwice = crypto.createHash('sha256').update(hashOnce).digest();
+
+  return hashTwice.slice(0,CHECK_SUM_LENGTH);
 }
 
 function base58Encode(input){

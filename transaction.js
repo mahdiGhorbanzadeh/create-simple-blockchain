@@ -195,11 +195,11 @@ function canBeUnlocked(output,data){
     return output.PubKey == data
 }
 
-async function getBalance(address,UTXOSet){
+async function getBalance(address,UTXOSet,nodeID){
 
     let wallets = new Wallets()
 
-    await wallets.loadFile();
+    await wallets.loadFile(nodeID);
 
     let res = wallets.getWallet(address);
 
@@ -214,13 +214,13 @@ async function getBalance(address,UTXOSet){
     return balance;
 }
 
-async function newTransaction(from,to,amount,UTXOSet){
+async function newTransaction(from,to,amount,UTXOSet,nodeID){
     let inputs = [];
     let outputs = [];
 
     let wallets = new Wallets()
 
-    await wallets.loadFile();
+    await wallets.loadFile(nodeID);
 
     let res = wallets.getWallet(from);
 

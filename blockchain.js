@@ -1,33 +1,38 @@
 
 const {Block} = require('./block')
 const {Proof} = require("./proof")
-const {DB,LH_KEY} = require('./db')
+const {createDB,LH_KEY} = require('./db')
 const {coinbaseTx,isCoinBaseTx, sign, verify, usesKey, isLockedWithKey} = require("./transaction")
 const { sha256 } = require('bitcoinjs-lib/src/crypto')
 class Blockchain {
-    constructor(address){
+    constructor(address,node){
+        this.DB = createDB(node);
+
         this.initBlockchain(address)
+        
         this.Miner = address;
     }
 
     async initBlockchain(address){
         try{
-            let res = await DB.get(LH_KEY)
-
+            let res = await this.DB.get(LH_KEY)
             this.LastHash = res;
         }catch(e){
             if(e.code == "LEVEL_NOT_FOUND"){
                 let cbtx = coinbaseTx(address,'')
-                let block = this.createBlock([cbtx],'');
-                console.log("block.Hash",block.Hash)
-                DB.put(block.Hash,this.serialize(block))
-                DB.put(LH_KEY,block.Hash)  
+                let block = this.createBlock([cbtx],'',0);
+
+                console.log("block.Hash",this.serialize(block))
+                console.log("block.LH_KEY",LH_KEY)
+                
+                this.DB.put(block.Hash,this.serialize(block))
+                this.DB.put(LH_KEY,block.Hash)  
             }
         }  
     }
 
-    createBlock(txs,prevHash){
-        let block = new Block('',txs,prevHash,0)
+    createBlock(txs,prevHash,height){
+        let block = new Block(this.createTimeStamp(),'',txs,prevHash,0,height)
         let pow = new Proof(block) 
         let res = pow.run()
 
@@ -37,7 +42,104 @@ class Blockchain {
         return block;
     }
 
-    async addBlock(txs){
+    createTimeStamp(){
+        return (BigInt(new Date().getTime())).toString();
+    }
+
+    async addBlock(block) {
+        try {
+
+            const txn = db.batch();
+    
+            try {
+                const blockExists = await db.get(block.hash).catch(() => null);
+            
+                if (blockExists) {
+                    return;
+                }
+        
+            }catch(e){
+
+                const blockData = serializeBlock(block);
+                await txn.put(block.hash, blockData);
+        
+                const lastHash = await txn.get('lh');
+                const lastBlockData = await txn.get(lastHash);
+                const lastBlock = this.deserialize(lastBlockData);
+        
+                if (!lastBlock || block.height > lastBlock.height) {
+                    await txn.put('lh', block.hash);
+                    this.LastHash = block.hash;
+                }
+        
+                await txn.write();
+
+            }
+        } catch (error) {
+            console.error('Error while adding block:', error);
+        }
+    }
+
+    async getBestHeight() {
+        try {
+            const lastHash = await db.get('lh');
+
+            const lastBlockData = await db.get(lastHash);
+            
+            const lastBlock = deserializeBlock(lastBlockData);
+            
+            return lastBlock.Height;
+
+        } catch (error) {
+            console.error('Error while getting best height:', error);
+            throw new Error('Error fetching best height');
+        }
+    }
+
+
+    async getBlockHashes() {
+        const blocks = [];
+
+        let currentHash = await db.get('lh').catch(() => null);
+    
+        while (currentHash) {
+            blocks.push(currentHash);
+            const blockData = await db.get(currentHash).catch(() => null);
+    
+            if (blockData) {
+                const block = deserializeBlock(blockData);
+                currentHash = block.PrevHash;
+            } else {
+                break;
+            }
+        }
+    
+        return blocks;
+    }
+
+
+    async getBlock(blockHash) {
+        try {
+            const blockData = await db.get(blockHash);
+            
+            const block = this.deserialize(blockData);
+
+            return block;
+        
+        } catch (error) {
+
+            if (error.code == "LEVEL_NOT_FOUND") {
+                return null;
+            }
+
+            throw new Error('Error fetching block');
+        }
+    }
+
+    async mineBlock(txs){
+
+        let lastHash;
+        let lastHeight = 0;
 
         for (let i = 0; i < txs.length; i++) {
             if(await (this.verifyTransaction(txs[i])) != true){
@@ -48,18 +150,29 @@ class Blockchain {
             }
         }
 
+        try {
+            lastHash = await db.get('lh');
+            const lastBlockData = await db.get(lastHash);
+            const lastBlock = this.deserialize(lastBlockData);
+            lastHeight = lastBlock.Height;
+        } catch (error) {
+            console.error(error);
+        }
+      
+
         let tx = coinbaseTx(this.Miner,"");
 
-        let newBlock = this.createBlock([tx,...txs],this.LastHash);
+        let newBlock = this.createBlock([tx,...txs],this.LastHash,lastHeight+1);
 
         this.LastHash = newBlock.Hash;
 
-        DB.put(LH_KEY,newBlock.Hash);
+        this.DB.put(LH_KEY,newBlock.Hash);
         
-        DB.put(newBlock.Hash,this.serialize(newBlock));
+        this.DB.put(newBlock.Hash,this.serialize(newBlock));
     }
 
     serialize(block){
+
       return JSON.stringify(block)
     }
 
@@ -91,7 +204,7 @@ class Blockchain {
         let spentTXOs = {}
 
         while(true){
-            let block = this.deserialize(await DB.get(currentHash));
+            let block = this.deserialize(await this.DB.get(currentHash));
 
             block.Transactions.map(tx=>{
                 for (let i = 0; i < tx.TxOutputs.length; i++) {
@@ -192,7 +305,7 @@ class Blockchain {
         let spentTXOs = {}
 
         while(true){
-            let block = this.deserialize(await DB.get(currentHash));
+            let block = this.deserialize(await this.DB.get(currentHash));
 
             block.Transactions.map(tx=>{
                 for (let i = 0; i < tx.TxOutputs.length; i++) {
@@ -274,7 +387,7 @@ class Blockchain {
         let tx;
         
         while(true){
-            let block = this.deserialize(await DB.get(currentHash));
+            let block = this.deserialize(await this.DB.get(currentHash));
 
             console.log(".............................................");
 
@@ -300,9 +413,9 @@ class Blockchain {
 
     async iterate(){
         let currentHash = this.LastHash;
-        console.log("currentHash",currentHash)
+
         while(true){
-            let block = this.deserialize(await DB.get(currentHash));
+            let block = this.deserialize(await this.DB.get(currentHash));
 
             console.log(".............................................");
 

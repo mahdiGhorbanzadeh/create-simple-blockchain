@@ -3,7 +3,10 @@ const fs = require('fs').promises; // Using fs.promises to access the promised-b
 
 const { Wallet } = require('./wallet');
 
-const walletFile = "wallet.data"
+
+const createWalletFile  = (node) => {
+    return `wallet-${node}.data`
+}
 
 class Wallets {
 
@@ -25,9 +28,9 @@ class Wallets {
         return this.wallets[address];
     }
 
-    async loadFile(){
+    async loadFile(nodeId){
         try {
-            const file = await fs.readFile(walletFile);
+            const file = await fs.readFile(createWalletFile(nodeId));
             let wallets = JSON.parse(file);
             this.wallets = wallets;            
         } catch (error) {
@@ -36,8 +39,8 @@ class Wallets {
 
     }
 
-    saveFile(){
-        fs.writeFile(walletFile, JSON.stringify(this.wallets), (err) => {})
+    saveFile(nodeId){
+        fs.writeFile(createWalletFile(nodeId), JSON.stringify(this.wallets), (err) => {})
     }
 
 }

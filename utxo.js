@@ -1,4 +1,4 @@
-const {DB,LH_KEY} = require('./db');
+const {LH_KEY} = require('./db');
 const { isLockedWithKey } = require('./transaction');
 
 
@@ -13,7 +13,7 @@ class UTXOSet {
     let accumulated = 0;
 
     // Use LevelDB iterator to traverse the database
-    const iterator = DB.iterator({ gte: this.utxoPrefix , lte: this.utxoPrefix + '\xff' });
+    const iterator = this.blockchain.DB.iterator({ gte: this.utxoPrefix , lte: this.utxoPrefix + '\xff' });
 
     for await (const [key, value] of iterator) {
       
@@ -57,8 +57,7 @@ class UTXOSet {
     let amount = 0;
     
     for await (const [key, value] of Object.entries(utxos)) {
-      // console.log("this.utxoPrefix + key",this.utxoPrefix + key)
-      let utxo = this.deserializeOutputs(await DB.get(this.utxoPrefix + key))
+      let utxo = this.deserializeOutputs(await this.blockchain.DB.get(this.utxoPrefix + key))
       
       for (let i = 0; i < value.length; i++) {
         amount += Number(utxo[value[i]].Value)
@@ -73,7 +72,7 @@ class UTXOSet {
   async findUTXO(pubKeyHash) {
     let UTXOs = []
     
-    const iterator = DB.iterator({ gte: this.utxoPrefix , lte: this.utxoPrefix + '\xff' });
+    const iterator = this.blockchain.DB.iterator({ gte: this.utxoPrefix , lte: this.utxoPrefix + '\xff' });
 
     for await (const [key, value] of iterator) {
       
@@ -102,11 +101,11 @@ class UTXOSet {
     
     let counter = 0;
 
-    const iterator = DB.iterator({ gte: this.utxoPrefix, lte: this.utxoPrefix + '\xff' });
+    const iterator = this.blockchain.DB.iterator({ gte: this.utxoPrefix, lte: this.utxoPrefix + '\xff' });
 
     for await (const [key] of iterator) {
 
-      if (!key.startsWith(utxoPrefix)) {
+      if (!key.startsWith(this.utxoPrefix)) {
         throw "error key was not have prefix !!!!"
       }
 
@@ -132,21 +131,21 @@ class UTXOSet {
       batchOps.push({ type: 'put', key:final_key, value: this.serializeOutputs(value) });
     }
   
-    await DB.batch(batchOps);
+    await this.blockchain.DB.batch(batchOps);
   }
 
 
   async deleteByPrefix(prefix) {
 
     const deleteKeys = async (keysForDelete) => {
-      await DB.batch(keysForDelete.map(key => ({ type: 'del', key })));
+      await this.blockchain.DB.batch(keysForDelete.map(key => ({ type: 'del', key })));
     };
   
     const collectSize = 100000;
     const keysForDelete = [];
 
   
-    const iterator = DB.iterator({ gte: prefix, lte: prefix + '\xff' });
+    const iterator = this.blockchain.DB.iterator({ gte: prefix, lte: prefix + '\xff' });
     
     for await (const [key, value] of iterator) {
 
@@ -180,7 +179,7 @@ class UTXOSet {
       batchOps.push({ type: 'put', key:final_key, value: this.serializeOutputs(tx.TxOutputs) });
     }
 
-    await DB.batch(batchOps);
+    await this.blockchain.DB.batch(batchOps);
 
   }
 

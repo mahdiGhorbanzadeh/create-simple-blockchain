@@ -5,14 +5,16 @@ let PATH = require('path');
 require('dotenv').config()
 
 
-let dbPath = PATH.join(process.env.DB_PATH, 'mydb');   
+const createDB = (path) => {
+   let dbPath = PATH.join(process.env.DB_PATH, `db/db-${path}`);   
 
-let DB = new Level(dbPath);
+   let DB = new Level(dbPath);
 
-
+   return DB;
+}
 
 module.exports = {
-   DB,
+   createDB,
    LH_KEY:"lh"
 }
 
