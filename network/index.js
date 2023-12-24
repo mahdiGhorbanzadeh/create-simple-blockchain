@@ -1,47 +1,47 @@
-const net = require('net');
-const { Readable } = require('stream');
+const net = require("net");
+const { Readable } = require("stream");
 
 const COMMAND_LENGTH = 12;
 
-let nodeAddress ='';
-let mineAddress= '';
-let KnownNodes = ["localhost:3000"]
+let nodeAddress = "";
+let mineAddress = "";
+let KnownNodes = ["localhost:3000"];
 let blocksInTransit = [];
 let memoryPool = {};
 
 class Addr {
-  constructor(addrList=[]) {
+  constructor(addrList = []) {
     this.AddrList = addrList;
   }
 }
 class Block {
-  constructor(addrFrom ='',block=Buffer.alloc(0)){
-    this.AddrFrom = addrFrom
-    this.Block = block 
+  constructor(addrFrom = "", block = Buffer.alloc(0)) {
+    this.AddrFrom = addrFrom;
+    this.Block = block;
   }
 }
 class GetData {
-  constructor(addrFrom='', type='', id=[]) {
+  constructor(addrFrom = "", type = "", id = []) {
     this.AddrFrom = addrFrom;
     this.Type = type;
     this.ID = id;
   }
 }
 class Inv {
-  constructor(addrFrom='', type='', items=[]) {
+  constructor(addrFrom = "", type = "", items = []) {
     this.AddrFrom = addrFrom;
     this.Type = type;
-    this.Items = items; 
+    this.Items = items;
   }
 }
 class Tx {
-  constructor(addrFrom='', transaction=Buffer.alloc(0)) {
+  constructor(addrFrom = "", transaction = Buffer.alloc(0)) {
     this.AddrFrom = addrFrom;
     this.Transaction = transaction; // Initialize with an empty Buffer or provided transaction data
   }
 }
 class Version {
-  constructor(version=0, bestHeight=0, addrFrom='') {
+  constructor(version = 0, bestHeight = 0, addrFrom = "") {
     this.Version = version;
     this.BestHeight = bestHeight;
     this.AddrFrom = addrFrom;
@@ -55,7 +55,7 @@ function cmdToBytes(cmd) {
 }
 
 function bytesToCmd(bytes) {
-  let cmd = '';
+  let cmd = "";
 
   for (let i = 0; i < bytes.length; i++) {
     if (bytes[i] !== 0x0) {
@@ -73,7 +73,7 @@ function extractCmd(request) {
 }
 
 function requestBlocks() {
-  KnownNodes.forEach(node => {
+  KnownNodes.forEach((node) => {
     sendGetBlocks(node);
   });
 }
@@ -81,68 +81,64 @@ function requestBlocks() {
 function sendAddr(address) {
   const nodes = new Addr(KnownNodes);
   nodes.AddrList.push(nodeAddress);
-  const payload = JSON.stringify(nodes); 
+  const payload = JSON.stringify(nodes);
 
   console.log(`Sending data to ${address}:`, payload);
 }
 
 function sendBlock(addr, block) {
-  const data = new Block(nodeAddress, block); 
-  const payload = JSON.stringify(data); 
+  const data = new Block(nodeAddress, block);
+  const payload = JSON.stringify(data);
   const cmdBytes = CmdToBytes("block");
-  const request = cmdBytes.concat(Buffer.from(payload)); 
+  const request = cmdBytes.concat(Buffer.from(payload));
 
   sendData(addr, request);
 }
-
 
 // first try to connect destination node
 // if success send data with dataStream
 // if fail remove node from node list
 
 function sendData(addr, data) {
-    const client = new net.Socket();
-  
-    client.on('error', (err) => {
-      console.log(`${addr} is not available`);
-      let updatedNodes = KnownNodes.filter((node) => node !== addr);
-      KnownNodes = updatedNodes;
-      client.destroy();
-    });
-  
-    client.connect({ port: PORT, host: addr }, () => {
-      const dataStream = new Readable();
-      dataStream.push(data);
-      dataStream.push(null);
-  
-      dataStream.pipe(client);
-    });
-  
-    client.on('close', () => {
-      console.log('Connection closed');
-    });
+  const client = new net.Socket();
+
+  client.on("error", (err) => {
+    console.log(`${addr} is not available`);
+    let updatedNodes = KnownNodes.filter((node) => node !== addr);
+    KnownNodes = updatedNodes;
+    client.destroy();
+  });
+
+  client.connect({ port: PORT, host: addr }, () => {
+    const dataStream = new Readable();
+    dataStream.push(data);
+    dataStream.push(null);
+
+    dataStream.pipe(client);
+  });
+
+  client.on("close", () => {
+    console.log("Connection closed");
+  });
 }
 
 function sendInv(address, kind, items) {
   const inventory = {
-    AddrFrom: nodeAddress, 
+    AddrFrom: nodeAddress,
     Type: kind,
     Items: items,
   };
 
-  const payload = JSON.stringify(inventory); 
+  const payload = JSON.stringify(inventory);
 
-  const request = Buffer.concat([
-    cmdToBytes('inv'), 
-    Buffer.from(payload), 
-  ]);
+  const request = Buffer.concat([cmdToBytes("inv"), Buffer.from(payload)]);
 
-  sendData(address, request); 
+  sendData(address, request);
 }
 
 function sendGetData(address, kind, id) {
   const payload = GobEncode({ nodeAddress, kind, id });
-  const request = Buffer.concat([cmdToBytes('getdata'), payload]);
+  const request = Buffer.concat([cmdToBytes("getdata"), payload]);
 
   sendData(address, request);
 }
@@ -150,69 +146,63 @@ function sendGetData(address, kind, id) {
 function sendGetBlocks(address) {
   const payload = JSON.stringify({ AddrFrom: nodeAddress });
   const request = Buffer.concat([
-    cmdToBytes('getblocks'), 
-    Buffer.from(payload), 
+    cmdToBytes("getblocks"),
+    Buffer.from(payload),
   ]);
 
   sendData(address, request);
 }
 
 function sendTx(addr, tnx) {
-  const serializedTx = tnx.Serialize(); 
+  const serializedTx = tnx.serialize();
 
   const data = {
-    AddrFrom: nodeAddress, 
+    AddrFrom: nodeAddress,
     Transaction: serializedTx,
   };
 
   const payload = JSON.stringify(data);
 
-  const request = Buffer.concat([
-    cmdToBytes('tx'), 
-    Buffer.from(payload), 
-  ]);
+  const request = Buffer.concat([cmdToBytes("tx"), Buffer.from(payload)]);
 
-  sendData(addr, request); 
+  sendData(addr, request);
 }
 
 function sendVersion(addr, chain) {
-  const bestHeight = chain.GetBestHeight(); 
+  const bestHeight = chain.GetBestHeight();
   const payload = JSON.stringify({
-    Version: version, 
+    Version: version,
     BestHeight: bestHeight,
-    AddrFrom: nodeAddress, 
+    AddrFrom: nodeAddress,
   });
 
-  const request = Buffer.concat([
-    cmdToBytes('version'), 
-    Buffer.from(payload), 
-  ]);
+  const request = Buffer.concat([cmdToBytes("version"), Buffer.from(payload)]);
 
-  sendData(addr, request); 
+  sendData(addr, request);
 }
 
 function handleAddr(request) {
-  const commandLength = 12; 
+  const commandLength = 12;
 
-  const payload = JSON.parse(request.slice(commandLength).toString()); 
-  
-  knownNodes.push(...payload.AddrList); 
-  
+  const payload = JSON.parse(request.slice(commandLength).toString());
+
+  knownNodes.push(...payload.AddrList);
+
   console.log(`There are ${knownNodes.length} known nodes`);
-  
+
   RequestBlocks();
 }
 
 function handleBlock(request, chain) {
   const commandLength = 12;
 
-  const payload = JSON.parse(request.slice(commandLength).toString()); 
+  const payload = JSON.parse(request.slice(commandLength).toString());
 
   const blockData = payload.Block;
-  const block = blockchain.Deserialize(blockData); 
+  const block = blockchain.Deserialize(blockData);
 
   console.log("Received a new block!");
-  chain.AddBlock(block); 
+  chain.AddBlock(block);
 
   console.log(`Added block ${block.Hash}`);
 
@@ -220,70 +210,75 @@ function handleBlock(request, chain) {
     const blockHash = blocksInTransit[0];
     sendGetData(payload.AddrFrom, "block", blockHash);
 
-    blocksInTransit = blocksInTransit.slice(1); 
+    blocksInTransit = blocksInTransit.slice(1);
   } else {
-    const UTXOSet = new blockchain.UTXOSet(chain); 
+    const UTXOSet = new blockchain.UTXOSet(chain);
     UTXOSet.Reindex();
   }
 }
 
 function handleInv(request, chain) {
-  const commandLength = 12; 
+  const commandLength = 12;
 
   const payload = JSON.parse(request.slice(commandLength).toString());
 
-  console.log(`Received inventory with ${payload.Items.length} ${payload.Type}`);
+  console.log(
+    `Received inventory with ${payload.Items.length} ${payload.Type}`
+  );
 
-  if (payload.Type === 'block') {
+  if (payload.Type === "block") {
     blocksInTransit = payload.Items;
 
     const blockHash = payload.Items[0];
-    sendGetData(payload.AddrFrom, 'block', blockHash); 
+    sendGetData(payload.AddrFrom, "block", blockHash);
 
-    const newInTransit = blocksInTransit.filter(b => !Buffer.from(b).equals(Buffer.from(blockHash)));
+    const newInTransit = blocksInTransit.filter(
+      (b) => !Buffer.from(b).equals(Buffer.from(blockHash))
+    );
     blocksInTransit = newInTransit;
   }
 
-  if (payload.Type === 'tx') {
+  if (payload.Type === "tx") {
     const txID = payload.Items[0];
 
     if (!memoryPool[txID]) {
-      sendGetData(payload.AddrFrom, 'tx', txID); 
+      sendGetData(payload.AddrFrom, "tx", txID);
     }
   }
 }
 
 function handleGetBlocks(request, chain) {
-  const commandLength = 12; 
+  const commandLength = 12;
 
   const payload = JSON.parse(request.slice(commandLength).toString());
 
-  const blocks = chain.getBlockHashes(); 
-  
-  sendInv(payload.AddrFrom, "block", blocks); 
+  const blocks = chain.getBlockHashes();
+
+  sendInv(payload.AddrFrom, "block", blocks);
 }
 
 function handleGetData(request, chain) {
   const commandLength = 12;
 
-  const payload = JSON.parse(request.slice(commandLength).toString()); 
+  const payload = JSON.parse(request.slice(commandLength).toString());
 
   if (payload.Type === "block") {
-    chain.getBlock(Buffer.from(payload.ID)) 
-      .then(block => {
-        SendBlock(payload.AddrFrom, block); 
+    chain
+      .getBlock(Buffer.from(payload.ID))
+      .then((block) => {
+        SendBlock(payload.AddrFrom, block);
       })
-      .catch(err => {
+      .catch((err) => {
         console.error(err);
       });
   }
 
   if (payload.Type === "tx") {
-    const txID = Buffer.from(payload.ID).toString('hex');
+    const txID = Buffer.from(payload.ID).toString("hex");
     const tx = memoryPool[txID];
 
     if (tx) {
-      sendTx(payload.AddrFrom, tx); 
+      sendTx(payload.AddrFrom, tx);
     } else {
       console.error(`Transaction ${txID} not found in memory pool`);
     }
@@ -291,17 +286,17 @@ function handleGetData(request, chain) {
 }
 
 function handleTx(request, chain) {
-  const commandLength = 12; 
+  const commandLength = 12;
 
-  const payload = JSON.parse(request.slice(commandLength).toString()); 
+  const payload = JSON.parse(request.slice(commandLength).toString());
 
   const tx = blockchain.DeserializeTransaction(payload.Transaction);
-  memoryPool[Buffer.from(tx.ID).toString('hex')] = tx; 
-  
+  memoryPool[Buffer.from(tx.ID).toString("hex")] = tx;
+
   console.log(`${nodeAddress}, ${Object.keys(memoryPool).length}`);
 
   if (nodeAddress === KnownNodes[0]) {
-    KnownNodes.forEach(node => {
+    KnownNodes.forEach((node) => {
       if (node !== nodeAddress && node !== payload.AddrFrom) {
         sendInv(node, "tx", [tx.ID]);
       }
@@ -339,7 +334,7 @@ async function mineTx(chain) {
   console.log("New Block mined");
 
   for (const tx of txs) {
-    const txID = Buffer.from(tx.ID).toString('hex');
+    const txID = Buffer.from(tx.ID).toString("hex");
     delete memoryPool[txID];
   }
 
@@ -355,13 +350,13 @@ async function mineTx(chain) {
 }
 
 function handleVersion(request, chain) {
-  const payload = JSON.parse(request.slice(COMMAND_LENGTH).toString()); 
+  const payload = JSON.parse(request.slice(COMMAND_LENGTH).toString());
 
   const bestHeight = chain.GetBestHeight();
   const otherHeight = payload.BestHeight;
 
   if (bestHeight < otherHeight) {
-    sendGetBlocks(payload.AddrFrom); 
+    sendGetBlocks(payload.AddrFrom);
   } else if (bestHeight > otherHeight) {
     sendVersion(payload.AddrFrom, chain);
   }
@@ -372,34 +367,34 @@ function handleVersion(request, chain) {
 }
 
 function handleConnection(data, chain) {
-  const commandLength = 12; 
+  const commandLength = 12;
   const command = bytesToCmd(data.slice(0, commandLength));
   console.log(`Received ${command} command`);
 
   switch (command) {
-      case 'addr':
-          handleAddr(data);
-          break;
-      case 'block':
-          handleBlock(data, chain);
-          break;
-      case 'inv':
-          handleInv(data, chain);
-          break;
-      case 'getblocks':
-          handleGetBlocks(data, chain);
-          break;
-      case 'getdata':
-          handleGetData(data, chain);
-          break;
-      case 'tx':
-          handleTx(data, chain);
-          break;
-      case 'version':
-          handleVersion(data, chain);
-          break;
-      default:
-          console.log('Unknown command');
+    case "addr":
+      handleAddr(data);
+      break;
+    case "block":
+      handleBlock(data, chain);
+      break;
+    case "inv":
+      handleInv(data, chain);
+      break;
+    case "getblocks":
+      handleGetBlocks(data, chain);
+      break;
+    case "getdata":
+      handleGetData(data, chain);
+      break;
+    case "tx":
+      handleTx(data, chain);
+      break;
+    case "version":
+      handleVersion(data, chain);
+      break;
+    default:
+      console.log("Unknown command");
   }
 }
 
@@ -408,33 +403,33 @@ const startServer = (nodeID, minerAddress) => {
   mineAddress = minerAddress;
 
   const server = net.createServer((socket) => {
-    console.log('New connection established');
+    console.log("New connection established");
 
-    const chain = blockchain.ContinueBlockChain(nodeID); 
-    chain.Database.close(); 
+    const chain = blockchain.ContinueBlockChain(nodeID);
+    chain.Database.close();
 
     if (nodeAddress !== KnownNodes[0]) {
       sendVersion(KnownNodes[0], chain);
     }
 
-    socket.on('data', (data) => {
+    socket.on("data", (data) => {
       handleConnection(data, chain);
     });
 
-    socket.on('error', (err) => {
-      console.error('Connection error:', err);
+    socket.on("error", (err) => {
+      console.error("Connection error:", err);
     });
 
-    socket.on('close', () => {
-      console.log('Connection closed');
+    socket.on("close", () => {
+      console.log("Connection closed");
     });
   });
 
-  server.on('error', (err) => {
-    console.error('Server error:', err);
+  server.on("error", (err) => {
+    console.error("Server error:", err);
   });
 
-  server.listen(nodeID, 'localhost', () => {
+  server.listen(nodeID, "localhost", () => {
     console.log(`Server running on localhost:${nodeID}`);
   });
 };
@@ -450,21 +445,21 @@ function GobEncode(data) {
 }
 
 function nodeIsKnown(addr) {
-  return KnownNodes.includes(addr); 
+  return KnownNodes.includes(addr);
 }
 
 function closeDB(chain) {
   const cleanupFunction = () => {
-  chain.Database.close(); 
+    chain.Database.close();
     process.exit(1);
   };
 
-  process.on('SIGINT', cleanupFunction);
-  process.on('SIGTERM', cleanupFunction);
+  process.on("SIGINT", cleanupFunction);
+  process.on("SIGTERM", cleanupFunction);
 }
 
 module.exports = {
   startServer,
   sendTx,
-  KnownNodes
-}
+  KnownNodes,
+};

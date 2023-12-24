@@ -1,11 +1,10 @@
-const {LH_KEY} = require('./db');
-const { isLockedWithKey } = require('./transaction');
-
+const { LH_KEY } = require("./db");
+const { isLockedWithKey } = require("./transaction");
 
 class UTXOSet {
   constructor(blockchain) {
     this.blockchain = blockchain;
-    this.utxoPrefix = 'UTXO-';
+    this.utxoPrefix = "UTXO-";
   }
 
   async findSpendableOutputs(pubKeyHash, amount) {
@@ -13,13 +12,15 @@ class UTXOSet {
     let accumulated = 0;
 
     // Use LevelDB iterator to traverse the database
-    const iterator = this.blockchain.DB.iterator({ gte: this.utxoPrefix , lte: this.utxoPrefix + '\xff' });
+    const iterator = this.blockchain.DB.iterator({
+      gte: this.utxoPrefix,
+      lte: this.utxoPrefix + "\xff",
+    });
 
     for await (const [key, value] of iterator) {
-      
-      console.log("key",key)
+      console.log("key", key);
 
-      console.log("value",value)
+      console.log("value", value);
 
       const txID = key.substring(this.utxoPrefix.length);
 
@@ -28,8 +29,7 @@ class UTXOSet {
       for (let outIdx = 0; outIdx < outs.length; outIdx++) {
         const out = outs[outIdx];
 
-        if (isLockedWithKey(out,pubKeyHash) && accumulated < amount) {
-
+        if (isLockedWithKey(out, pubKeyHash) && accumulated < amount) {
           accumulated += Number(out.Value);
 
           if (!unspentOuts[txID]) {
@@ -38,10 +38,9 @@ class UTXOSet {
 
           unspentOuts[txID].push(outIdx);
 
-          if(accumulated>Number(amount)){
+          if (accumulated > Number(amount)) {
             break;
           }
-
         }
       }
     }
@@ -49,33 +48,33 @@ class UTXOSet {
     return { accumulated, unspentOuts };
   }
 
-
-  async getBalance(pubKeyHash){
-    
+  async getBalance(pubKeyHash) {
     let utxos = await this.findUTXO(pubKeyHash);
-      
-    let amount = 0;
-    
-    for await (const [key, value] of Object.entries(utxos)) {
-      let utxo = this.deserializeOutputs(await this.blockchain.DB.get(this.utxoPrefix + key))
-      
-      for (let i = 0; i < value.length; i++) {
-        amount += Number(utxo[value[i]].Value)
-      }
 
+    let amount = 0;
+
+    for await (const [key, value] of Object.entries(utxos)) {
+      let utxo = this.deserializeOutputs(
+        await this.blockchain.DB.get(this.utxoPrefix + key)
+      );
+
+      for (let i = 0; i < value.length; i++) {
+        amount += Number(utxo[value[i]].Value);
+      }
     }
 
     return amount;
   }
 
-
   async findUTXO(pubKeyHash) {
-    let UTXOs = []
-    
-    const iterator = this.blockchain.DB.iterator({ gte: this.utxoPrefix , lte: this.utxoPrefix + '\xff' });
+    let UTXOs = [];
+
+    const iterator = this.blockchain.DB.iterator({
+      gte: this.utxoPrefix,
+      lte: this.utxoPrefix + "\xff",
+    });
 
     for await (const [key, value] of iterator) {
-      
       const txID = key.substring(this.utxoPrefix.length);
 
       const outs = this.deserializeOutputs(value);
@@ -83,7 +82,7 @@ class UTXOSet {
       for (let outIdx = 0; outIdx < outs.length; outIdx++) {
         const out = outs[outIdx];
 
-        if (isLockedWithKey(out,pubKeyHash)) {
+        if (isLockedWithKey(out, pubKeyHash)) {
           if (!UTXOs[txID]) {
             UTXOs[txID] = [];
           }
@@ -93,20 +92,20 @@ class UTXOSet {
       }
     }
 
-
-    return UTXOs
+    return UTXOs;
   }
 
-  async countTransactions(){
-    
+  async countTransactions() {
     let counter = 0;
 
-    const iterator = this.blockchain.DB.iterator({ gte: this.utxoPrefix, lte: this.utxoPrefix + '\xff' });
+    const iterator = this.blockchain.DB.iterator({
+      gte: this.utxoPrefix,
+      lte: this.utxoPrefix + "\xff",
+    });
 
     for await (const [key] of iterator) {
-
       if (!key.startsWith(this.utxoPrefix)) {
-        throw "error key was not have prefix !!!!"
+        throw "error key was not have prefix !!!!";
       }
 
       counter++;
@@ -115,46 +114,48 @@ class UTXOSet {
     return counter;
   }
 
-
   async reIndex() {
- 
-    const utxos = await this.blockchain.findUTXODB(); 
-  
+    const utxos = await this.blockchain.findUTXODB();
+
     await this.deleteByPrefix(this.utxoPrefix);
-    
+
     const batchOps = [];
 
     for (const [key, value] of Object.entries(utxos)) {
-      
       let final_key = this.utxoPrefix + key;
-      
-      batchOps.push({ type: 'put', key:final_key, value: this.serializeOutputs(value) });
+
+      batchOps.push({
+        type: "put",
+        key: final_key,
+        value: this.serializeOutputs(value),
+      });
     }
-  
+
     await this.blockchain.DB.batch(batchOps);
   }
 
-
   async deleteByPrefix(prefix) {
-
     const deleteKeys = async (keysForDelete) => {
-      await this.blockchain.DB.batch(keysForDelete.map(key => ({ type: 'del', key })));
+      await this.blockchain.DB.batch(
+        keysForDelete.map((key) => ({ type: "del", key }))
+      );
     };
-  
+
     const collectSize = 100000;
     const keysForDelete = [];
 
-  
-    const iterator = this.blockchain.DB.iterator({ gte: prefix, lte: prefix + '\xff' });
-    
-    for await (const [key, value] of iterator) {
+    const iterator = this.blockchain.DB.iterator({
+      gte: prefix,
+      lte: prefix + "\xff",
+    });
 
+    for await (const [key, value] of iterator) {
       if (!key.startsWith(prefix)) {
-        throw "error key was not have prefix !!!! (deleteByPrefix)"
+        throw "error key was not have prefix !!!! (deleteByPrefix)";
       }
-  
+
       keysForDelete.push(key);
-  
+
       if (keysForDelete.length === collectSize) {
         await deleteKeys(keysForDelete);
         keysForDelete.length = 0;
@@ -166,35 +167,33 @@ class UTXOSet {
     }
   }
 
-  async update(block){
-
+  async update(block) {
     const batchOps = [];
 
     for (let i = 0; i < block.Tranactions.length; i++) {
-      
       const tx = block.Tranactions[i];
 
       let final_key = this.utxoPrefix + tx.ID;
 
-      batchOps.push({ type: 'put', key:final_key, value: this.serializeOutputs(tx.TxOutputs) });
+      batchOps.push({
+        type: "put",
+        key: final_key,
+        value: this.serializeOutputs(tx.TxOutputs),
+      });
     }
 
     await this.blockchain.DB.batch(batchOps);
-
   }
 
-  deserializeOutputs(outputs){
-    return JSON.parse(outputs)
+  deserializeOutputs(outputs) {
+    return JSON.parse(outputs);
   }
 
-  serializeOutputs(outputs){
-    return JSON.stringify(outputs)
+  serializeOutputs(outputs) {
+    return JSON.stringify(outputs);
   }
-  
 }
-
 
 module.exports = {
-  UTXOSet
-}
-
+  UTXOSet,
+};
