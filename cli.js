@@ -5,9 +5,10 @@ const { Blockchain } = require("./blockchain");
 const { UTXOSet } = require("./utxo");
 const { Wallets } = require("./wallets");
 const { newTransaction, coinbaseTx, getBalance } = require("./transaction");
+const { address } = require("bitcoinjs-lib");
 
 class CommandLine {
-  startNode(nodeID, minerAddress) {
+  startNode(nodeID, minerAddress,address) {
     console.log(`Starting Node ${nodeID}`);
 
     if (minerAddress) {
@@ -19,7 +20,7 @@ class CommandLine {
       }
     }
 
-    startServer(nodeID, minerAddress);
+    startServer(nodeID, minerAddress,address);
   }
 
   async reindexUTXO(address, nodeID) {
@@ -95,7 +96,7 @@ class CommandLine {
 
     const utxo = new UTXOSet(chain);
 
-    const tx = newTransaction(from, to, amount, utxo, nodeID);
+    const tx = await newTransaction(from, to, amount, utxo, nodeID);
 
     if (mineNow) {
       const cbTx = coinbaseTx(from, "");
@@ -122,8 +123,9 @@ program
   .description("Start a node")
   .option("-n, --nodeid <nodeid>", "Set node ID")
   .option("-m, --miner <miner>", "Set miner address")
+  .option("-a, --address <address>", "Set address")
   .action((options) => {
-    cli.startNode(options.nodeid, options.miner);
+    cli.startNode(options.nodeid, options.miner,options.address);
   });
 //-------> node ./cli.js startnode -n 3000 -m
 

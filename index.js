@@ -218,7 +218,7 @@ async function main2(){
 
 // createWallet();
 
-createBlockChain();
+// createBlockChain();
 
 // createTransactionDB();
 

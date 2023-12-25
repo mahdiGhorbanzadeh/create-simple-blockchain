@@ -109,7 +109,7 @@ function sendData(addr, data) {
     client.destroy();
   });
 
-  client.connect({ port: PORT, host: addr }, () => {
+  client.connect({ port: addr.split("localhost:")[1] }, () => {
     const dataStream = new Readable();
     dataStream.push(data);
     dataStream.push(null);
@@ -177,6 +177,8 @@ function sendVersion(addr, chain) {
   });
 
   const request = Buffer.concat([cmdToBytes("version"), Buffer.from(payload)]);
+
+  console.log("request",request)
 
   sendData(addr, request);
 }
@@ -398,16 +400,17 @@ function handleConnection(data, chain) {
   }
 }
 
-const startServer = (nodeID, minerAddress) => {
+const startServer = (nodeID, minerAddress,address) => {
   nodeAddress = `http://localhost:${nodeID}`;
   mineAddress = minerAddress;
 
-  const server = net.createServer((socket) => {
-    console.log("New connection established");
+  const server = net.createServer(async(socket) => {
+      console.log("New connection established");
 
-    const chain = blockchain.ContinueBlockChain(nodeID);
-    chain.Database.close();
+    const chain = new Blockchain(address, nodeID);
 
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    
     if (nodeAddress !== KnownNodes[0]) {
       sendVersion(KnownNodes[0], chain);
     }
@@ -429,7 +432,7 @@ const startServer = (nodeID, minerAddress) => {
     console.error("Server error:", err);
   });
 
-  server.listen(nodeID, "localhost", () => {
+  server.listen(nodeID,"localhost", () => {
     console.log(`Server running on localhost:${nodeID}`);
   });
 };
@@ -446,16 +449,6 @@ function GobEncode(data) {
 
 function nodeIsKnown(addr) {
   return KnownNodes.includes(addr);
-}
-
-function closeDB(chain) {
-  const cleanupFunction = () => {
-    chain.Database.close();
-    process.exit(1);
-  };
-
-  process.on("SIGINT", cleanupFunction);
-  process.on("SIGTERM", cleanupFunction);
 }
 
 module.exports = {
