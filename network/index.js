@@ -1,7 +1,11 @@
 const net = require("net");
 const { Readable } = require("stream");
+const { Blockchain } = require("../blockchain");
+const { UTXOSet } = require("../utxo");
+const { deserializeTransaction } = require("../transaction");
 
 const COMMAND_LENGTH = 12;
+const VERSION = 1
 
 let nodeAddress = "";
 let mineAddress = "";
@@ -169,9 +173,9 @@ function sendTx(addr, tnx) {
 }
 
 function sendVersion(addr, chain) {
-  const bestHeight = chain.GetBestHeight();
+  const bestHeight = chain.getBestHeight();
   const payload = JSON.stringify({
-    Version: version,
+    Version: VERSION,
     BestHeight: bestHeight,
     AddrFrom: nodeAddress,
   });
@@ -201,7 +205,7 @@ function handleBlock(request, chain) {
   const payload = JSON.parse(request.slice(commandLength).toString());
 
   const blockData = payload.Block;
-  const block = blockchain.Deserialize(blockData);
+  const block = chain.deserialize(blockData);
 
   console.log("Received a new block!");
   chain.AddBlock(block);
@@ -214,8 +218,8 @@ function handleBlock(request, chain) {
 
     blocksInTransit = blocksInTransit.slice(1);
   } else {
-    const UTXOSet = new blockchain.UTXOSet(chain);
-    UTXOSet.Reindex();
+    const utxo = new UTXOSet(chain);
+    utxo.reIndex();
   }
 }
 
@@ -292,7 +296,9 @@ function handleTx(request, chain) {
 
   const payload = JSON.parse(request.slice(commandLength).toString());
 
-  const tx = blockchain.DeserializeTransaction(payload.Transaction);
+  const tx = deserializeTransaction(payload.Transaction);
+
+  console.log("tx",tx)
   memoryPool[Buffer.from(tx.ID).toString("hex")] = tx;
 
   console.log(`${nodeAddress}, ${Object.keys(memoryPool).length}`);
@@ -304,7 +310,7 @@ function handleTx(request, chain) {
       }
     });
   } else {
-    if (Object.keys(memoryPool).length >= 2 && mineAddress.length > 0) {
+    if (Object.keys(memoryPool).length >= 2 && mineAddress) {
       mineTx(chain);
     }
   }
@@ -326,11 +332,11 @@ async function mineTx(chain) {
     return;
   }
 
-  const cbTx = blockchain.CoinbaseTx(mineAddress, "");
+  const cbTx = chain.CoinbaseTx(mineAddress, "");
   txs.push(cbTx);
 
   const newBlock = await chain.mineBlock(txs);
-  const UTXOSet = new blockchain.UTXOSet(chain);
+  const UTXOSet = new chain.UTXOSet(chain);
   await UTXOSet.Reindex();
 
   console.log("New Block mined");
@@ -351,11 +357,18 @@ async function mineTx(chain) {
   }
 }
 
-function handleVersion(request, chain) {
+async function handleVersion(request, chain) {
   const payload = JSON.parse(request.slice(COMMAND_LENGTH).toString());
 
-  const bestHeight = chain.GetBestHeight();
+  console.log("111111111111111111")
+  const bestHeight = await chain.getBestHeight();
+
+  console.log("222222222222222222222",bestHeight,payload)
+
   const otherHeight = payload.BestHeight;
+
+  console.log("3333333333333333333",otherHeight)
+
 
   if (bestHeight < otherHeight) {
     sendGetBlocks(payload.AddrFrom);
@@ -363,7 +376,7 @@ function handleVersion(request, chain) {
     sendVersion(payload.AddrFrom, chain);
   }
 
-  if (!NodeIsKnown(payload.AddrFrom)) {
+  if (!nodeIsKnown(payload.AddrFrom)) {
     KnownNodes.push(payload.AddrFrom);
   }
 }

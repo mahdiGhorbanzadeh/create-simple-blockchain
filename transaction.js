@@ -45,6 +45,10 @@ class Transaction {
 
 }
 
+function deserializeTransaction(data){
+    return JSON.parse(data);
+}
+
 
 function coinbaseTx(to,data){
     if(!data){
@@ -270,6 +274,7 @@ async function newTransaction(from,to,amount,UTXOSet,nodeID){
 
 module.exports = {
     Transaction,
+    deserializeTransaction,
     coinbaseTx,
     isCoinBaseTx,
     canUnlock,

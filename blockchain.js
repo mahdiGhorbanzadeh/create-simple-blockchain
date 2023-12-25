@@ -54,10 +54,10 @@ class Blockchain {
 
   async addBlock(block) {
     try {
-      const txn = db.batch();
+      const txn = this.DB.batch();
 
       try {
-        const blockExists = await db.get(block.hash).catch(() => null);
+        const blockExists = await this.DB.get(block.hash).catch(() => null);
 
         if (blockExists) {
           return;
@@ -84,11 +84,11 @@ class Blockchain {
 
   async getBestHeight() {
     try {
-      const lastHash = await db.get("lh");
+      const lastHash = await this.DB.get("lh");
 
-      const lastBlockData = await db.get(lastHash);
+      const lastBlockData = await this.DB.get(lastHash);
 
-      const lastBlock = deserializeBlock(lastBlockData);
+      const lastBlock = this.deserialize(lastBlockData);
 
       return lastBlock.Height;
     } catch (error) {
@@ -100,14 +100,14 @@ class Blockchain {
   async getBlockHashes() {
     const blocks = [];
 
-    let currentHash = await db.get("lh").catch(() => null);
+    let currentHash = await this.DB.get("lh").catch(() => null);
 
     while (currentHash) {
       blocks.push(currentHash);
-      const blockData = await db.get(currentHash).catch(() => null);
+      const blockData = await this.DB.get(currentHash).catch(() => null);
 
       if (blockData) {
-        const block = deserializeBlock(blockData);
+        const block = this.deserialize(blockData);
         currentHash = block.PrevHash;
       } else {
         break;
@@ -119,7 +119,7 @@ class Blockchain {
 
   async getBlock(blockHash) {
     try {
-      const blockData = await db.get(blockHash);
+      const blockData = await this.DB.get(blockHash);
 
       const block = this.deserialize(blockData);
 
@@ -146,8 +146,8 @@ class Blockchain {
     }
 
     try {
-      lastHash = await db.get("lh");
-      const lastBlockData = await db.get(lastHash);
+      lastHash = await this.DB.get("lh");
+      const lastBlockData = await this.DB.get(lastHash);
       const lastBlock = this.deserialize(lastBlockData);
       lastHeight = lastBlock.Height;
     } catch (error) {
