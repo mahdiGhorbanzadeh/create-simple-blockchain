@@ -10,11 +10,18 @@ const createDB = (path) => {
 
    let DB = new Level(dbPath);
 
+   DB.open();
+   
    return DB;
+}
+
+const returnPath = (path)=>{
+   return PATH.join(process.env.DB_PATH, `db/db-${path}`);
 }
 
 module.exports = {
    createDB,
+   returnPath,
    LH_KEY:"lh"
 }
 

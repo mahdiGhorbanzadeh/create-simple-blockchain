@@ -127,6 +127,7 @@ function sendData(addr, data) {
 }
 
 function sendInv(address, kind, items) {
+  console.log("------------------sendInv-------------------------")
   const inventory = {
     AddrFrom: nodeAddress,
     Type: kind,
@@ -141,6 +142,7 @@ function sendInv(address, kind, items) {
 }
 
 function sendGetData(address, kind, id) {
+  console.log("------------------sendGetData-------------------------")
   const payload = GobEncode({ nodeAddress, kind, id });
   const request = Buffer.concat([cmdToBytes("getdata"), payload]);
 
@@ -148,6 +150,7 @@ function sendGetData(address, kind, id) {
 }
 
 function sendGetBlocks(address) {
+  console.log("------------------sendGetBlocks-------------------------")
   const payload = JSON.stringify({ AddrFrom: nodeAddress });
   const request = Buffer.concat([
     cmdToBytes("getblocks"),
@@ -158,6 +161,8 @@ function sendGetBlocks(address) {
 }
 
 function sendTx(addr, tnx) {
+  console.log("------------------sendTx-------------------------")
+
   const serializedTx = tnx.serialize();
 
   const data = {
@@ -172,8 +177,12 @@ function sendTx(addr, tnx) {
   sendData(addr, request);
 }
 
-function sendVersion(addr, chain) {
-  const bestHeight = chain.getBestHeight();
+async function sendVersion(addr, chain) {
+
+  console.log("------------------sendVersion-------------------------")
+
+
+  const bestHeight = await chain.getBestHeight();
   const payload = JSON.stringify({
     Version: VERSION,
     BestHeight: bestHeight,
@@ -188,6 +197,10 @@ function sendVersion(addr, chain) {
 }
 
 function handleAddr(request) {
+
+  console.log("------------------handleAddr-------------------------")
+
+
   const commandLength = 12;
 
   const payload = JSON.parse(request.slice(commandLength).toString());
@@ -200,6 +213,10 @@ function handleAddr(request) {
 }
 
 function handleBlock(request, chain) {
+
+  console.log("------------------handleBlock-------------------------")
+
+
   const commandLength = 12;
 
   const payload = JSON.parse(request.slice(commandLength).toString());
@@ -224,6 +241,10 @@ function handleBlock(request, chain) {
 }
 
 function handleInv(request, chain) {
+
+  console.log("------------------handleInv-------------------------")
+
+
   const commandLength = 12;
 
   const payload = JSON.parse(request.slice(commandLength).toString());
@@ -254,6 +275,9 @@ function handleInv(request, chain) {
 }
 
 function handleGetBlocks(request, chain) {
+
+  console.log("------------------handleGetBlocks-------------------------")
+
   const commandLength = 12;
 
   const payload = JSON.parse(request.slice(commandLength).toString());
@@ -264,6 +288,9 @@ function handleGetBlocks(request, chain) {
 }
 
 function handleGetData(request, chain) {
+
+  console.log("------------------handleGetData-------------------------")
+
   const commandLength = 12;
 
   const payload = JSON.parse(request.slice(commandLength).toString());
@@ -291,7 +318,11 @@ function handleGetData(request, chain) {
   }
 }
 
-function handleTx(request, chain) {
+async function handleTx(request, chain) {
+
+  console.log("------------------handleTx-------------------------")
+
+
   const commandLength = 12;
 
   const payload = JSON.parse(request.slice(commandLength).toString());
@@ -299,6 +330,7 @@ function handleTx(request, chain) {
   const tx = deserializeTransaction(payload.Transaction);
 
   console.log("tx",tx)
+
   memoryPool[Buffer.from(tx.ID).toString("hex")] = tx;
 
   console.log(`${nodeAddress}, ${Object.keys(memoryPool).length}`);
@@ -311,12 +343,19 @@ function handleTx(request, chain) {
     });
   } else {
     if (Object.keys(memoryPool).length >= 2 && mineAddress) {
-      mineTx(chain);
+      await mineTx(chain);
     }
   }
+
+  console.log("------------------finish handleTx-------------------------")
+
 }
 
 async function mineTx(chain) {
+
+  console.log("------------------mineTx-------------------------")
+
+
   const txs = [];
 
   for (const id in memoryPool) {
@@ -358,6 +397,9 @@ async function mineTx(chain) {
 }
 
 async function handleVersion(request, chain) {
+
+  console.log("------------------handleVersion-------------------------")
+
   const payload = JSON.parse(request.slice(COMMAND_LENGTH).toString());
 
   console.log("111111111111111111")
@@ -373,7 +415,7 @@ async function handleVersion(request, chain) {
   if (bestHeight < otherHeight) {
     sendGetBlocks(payload.AddrFrom);
   } else if (bestHeight > otherHeight) {
-    sendVersion(payload.AddrFrom, chain);
+    await sendVersion(payload.AddrFrom, chain);
   }
 
   if (!nodeIsKnown(payload.AddrFrom)) {
@@ -381,7 +423,11 @@ async function handleVersion(request, chain) {
   }
 }
 
-function handleConnection(data, chain) {
+async function handleConnection(data, chain) {
+
+  console.log("------------------handleConnection-------------------------")
+
+
   const commandLength = 12;
   const command = bytesToCmd(data.slice(0, commandLength));
   console.log(`Received ${command} command`);
@@ -403,10 +449,10 @@ function handleConnection(data, chain) {
       handleGetData(data, chain);
       break;
     case "tx":
-      handleTx(data, chain);
+      await handleTx(data, chain);
       break;
     case "version":
-      handleVersion(data, chain);
+      await handleVersion(data, chain);
       break;
     default:
       console.log("Unknown command");
@@ -414,22 +460,38 @@ function handleConnection(data, chain) {
 }
 
 const startServer = (nodeID, minerAddress,address) => {
+
+  console.log("------------------startServer-------------------------")
+
+
   nodeAddress = `http://localhost:${nodeID}`;
   mineAddress = minerAddress;
 
   const server = net.createServer(async(socket) => {
-      console.log("New connection established");
-
-    const chain = new Blockchain(address, nodeID);
-
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    console.log("New connection established");
     
     if (nodeAddress !== KnownNodes[0]) {
-      sendVersion(KnownNodes[0], chain);
+
+      console.log("----------------run here--------------------------")
+      
+      const chain = new Blockchain(address, nodeID);
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      await sendVersion(KnownNodes[0], chain);
+
+      await chain.closeDB();
     }
 
-    socket.on("data", (data) => {
-      handleConnection(data, chain);
+    socket.on("data", async (data) => {
+      let chain = new Blockchain(address, nodeID);
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      await handleConnection(data, chain);
+
+      await chain.closeDB();
+
     });
 
     socket.on("error", (err) => {

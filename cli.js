@@ -28,11 +28,14 @@ class CommandLine {
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
+
     const utxo = new UTXOSet(chain);
 
     await utxo.reIndex();
 
     const count = await utxo.countTransactions();
+
+    await chain.closeDB();
 
     console.log(`Done! There are ${count} transactions in the UTXO set.`);
   }
@@ -52,6 +55,9 @@ class CommandLine {
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
+    await chain.closeDB();
+
+
     chain.iterate();
   }
 
@@ -64,6 +70,8 @@ class CommandLine {
 
     await utxo.reIndex();
 
+    await chain.closeDB();
+
     console.log("Finished!");
   }
 
@@ -72,9 +80,12 @@ class CommandLine {
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
+
     let utxo = new UTXOSet(chain);
 
     let balance = await getBalance(address, utxo, nodeID);
+
+    await chain.closeDB();
 
     console.log("Balance of ", address, "  :  ", balance);
   }
@@ -111,6 +122,8 @@ class CommandLine {
 
       console.log("send tx");
     }
+
+    await chain.closeDB();
 
     console.log("Success!");
   }
