@@ -126,7 +126,6 @@ function base58Encode(input){
 }
 
 function base58Decode(input){
-  console.log("input input input input",input)
   return Buffer.from(bs58.decode(input),"hex");
 }
 

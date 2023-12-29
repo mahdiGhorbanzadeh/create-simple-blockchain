@@ -8,7 +8,7 @@ const { newTransaction, coinbaseTx, getBalance } = require("./transaction");
 const { address } = require("bitcoinjs-lib");
 
 class CommandLine {
-  startNode(nodeID, minerAddress,address) {
+  async startNode(nodeID, minerAddress,address) {
     console.log(`Starting Node ${nodeID}`);
 
     if (minerAddress) {
@@ -20,14 +20,13 @@ class CommandLine {
       }
     }
 
-    startServer(nodeID, minerAddress,address);
+    await startServer(nodeID, minerAddress,address);
   }
 
   async reindexUTXO(address, nodeID) {
     const chain = new Blockchain(address, nodeID);
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
+    await chain.continueBlockchain(address)
 
     const utxo = new UTXOSet(chain);
 
@@ -53,18 +52,18 @@ class CommandLine {
   async printChain(address, nodeID) {
     const chain = new Blockchain(address, nodeID);
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await chain.continueBlockchain(address)
+
+    chain.iterate();
 
     await chain.closeDB();
 
-
-    chain.iterate();
   }
 
   async createBlockChain(address, nodeID) {
     const chain = new Blockchain(address, nodeID);
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await chain.initBlockchain(address)
 
     const utxo = new UTXOSet(chain);
 
@@ -78,7 +77,7 @@ class CommandLine {
   async getBalanceUser(address, nodeID) {
     const chain = new Blockchain(address, nodeID);
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await chain.continueBlockchain(address);
 
 
     let utxo = new UTXOSet(chain);
@@ -103,12 +102,14 @@ class CommandLine {
 
     const chain = new Blockchain(from, nodeID);
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await chain.continueBlockchain(address);
 
     const utxo = new UTXOSet(chain);
 
     const tx = await newTransaction(from, to, amount, utxo, nodeID);
 
+    await chain.closeDB();
+    
     if (mineNow) {
       const cbTx = coinbaseTx(from, "");
 
@@ -123,7 +124,6 @@ class CommandLine {
       console.log("send tx");
     }
 
-    await chain.closeDB();
 
     console.log("Success!");
   }

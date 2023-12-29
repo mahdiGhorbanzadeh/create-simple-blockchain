@@ -1,6 +1,6 @@
 const { Block } = require("./block");
 const { Proof } = require("./proof");
-const { createDB, LH_KEY, returnPath } = require("./db");
+const { createDB, LH_KEY, returnPath, closeDBRes } = require("./db");
 const {
   coinbaseTx,
   isCoinBaseTx,
@@ -13,8 +13,6 @@ const { sha256 } = require("bitcoinjs-lib/src/crypto");
 class Blockchain {
   constructor(address, node) {
     this.Node = node;
-    this.initBlockchain(address);
-
     this.Miner = address;
   }
 
@@ -28,15 +26,31 @@ class Blockchain {
     } catch (e) {
       if (e.code == "LEVEL_NOT_FOUND") {
         let cbtx = coinbaseTx(address, "");
-        let block = this.createBlock([cbtx], "", 0);
+        let block = this.createBlock([cbtx], "", 1);
 
         console.log("block.Hash", this.serialize(block));
         console.log("block.LH_KEY", LH_KEY);
 
         this.DB.put(block.Hash, this.serialize(block));
         this.DB.put(LH_KEY, block.Hash);
+        
       }
     }
+  }
+
+  async continueBlockchain(){
+
+    await this.openDB();
+
+    try {
+      let res = await this.DB.get(LH_KEY);
+      this.LastHash = res;
+    } catch (e) {
+      if (e.code == "LEVEL_NOT_FOUND") {
+        this.LastHash = '';
+      }
+    }
+
   }
 
   createBlock(txs, prevHash, height) {
@@ -94,6 +108,11 @@ class Blockchain {
 
       return lastBlock.Height;
     } catch (error) {
+
+      if (error.code == "LEVEL_NOT_FOUND") {
+        return 0;
+      }
+
       console.error("Error while getting best height:", error);
       throw new Error("Error fetching best height");
     }
@@ -415,49 +434,25 @@ class Blockchain {
     }
   }
 
-  async retry(dir, originalOpts) {
-    const lockPath = `${dir}/LOCK`;
   
-    try {
-      await fs.unlink(lockPath);
-    } catch (err) {
-      console.error('Error removing lock:', err);
-      throw err;
-    }
-  
-    const retryOpts = { ...originalOpts, createIfMissing: true, errorIfExists: false };
-  
-    return level(dir, retryOpts);
-  }
-  
-  async openDB() {
-    try {
-      this.DB = createDB(this.Node)
-    } catch (err) {
-      if (err.message.includes('Database is not open')) {
-        try {
-          this.DB = await retry(returnPath(this.Node));
-          console.log('Database unlocked, value log truncated');
-        } catch (retryErr) {
-          console.log('Could not unlock database:', retryErr);
-          throw retryErr;
-        }
-      }
-      throw err;
-    }
+  async openDB() {    
+    this.DB = await createDB(this.Node)  
   }
 
   async closeDB(){
-    this.DB.close((err) => {
-      if (err) {
-        console.error('Error closing the database:', err);
-      } else {
-        console.log('Database closed successfully');
-      }
+    await new Promise((resolve, reject) => {
+      this.DB.close((err) => {
+        if (err) {
+          console.error('Error closing the database:', err);
+          reject(err);
+        } else {
+          console.log('Database closed successfully');
+          closeDBRes();
+          resolve();
+        }
+      });
     });
   }
-
-
 }
 
 module.exports = { Blockchain };
