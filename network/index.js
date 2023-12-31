@@ -93,8 +93,7 @@ function sendAddr(address) {
 function sendBlock(addr, block) {
   const data = new Block(nodeAddress, block);
   const payload = JSON.stringify(data);
-  const cmdBytes = CmdToBytes("block");
-  const request = cmdBytes.concat(Buffer.from(payload));
+  const request = Buffer.concat([cmdToBytes("block"), Buffer.from(payload)]);
 
   sendData(addr, request);
 }
@@ -162,7 +161,9 @@ function sendGetBlocks(address) {
 
 function sendTx(addr, tnx) {
   console.log("------------------sendTx-------------------------")
-
+  
+  console.log("tnx",tnx);
+  
   const serializedTx = tnx.serialize();
 
   const data = {
@@ -211,7 +212,7 @@ function handleAddr(request) {
   RequestBlocks();
 }
 
-function handleBlock(request, chain) {
+async function handleBlock(request, chain) {
 
   console.log("------------------handleBlock-------------------------")
 
@@ -220,13 +221,19 @@ function handleBlock(request, chain) {
 
   const payload = JSON.parse(request.slice(commandLength).toString());
 
-  const blockData = payload.Block;
-  const block = chain.deserialize(blockData);
+  console.log("payload",payload);
 
-  console.log("Received a new block!");
-  chain.AddBlock(block);
+  const blockData = payload.Block;
+
+  const block = blockData;
+
+  console.log("Received a new block! ",block);
+
+  await chain.addBlock(block);
 
   console.log(`Added block ${block.Hash}`);
+
+  console.log("blocksInTransit",blocksInTransit)
 
   if (blocksInTransit.length > 0) {
     const blockHash = blocksInTransit[0];
@@ -236,7 +243,7 @@ function handleBlock(request, chain) {
     blocksInTransit = blocksInTransit.slice(1);
   } else {
     const utxo = new UTXOSet(chain);
-    utxo.reIndex();
+    await utxo.reIndex();
   }
 }
 
@@ -262,9 +269,18 @@ function handleInv(request, chain) {
 
     console.log("blocksInTransit",blocksInTransit)
 
-    const newInTransit = blocksInTransit.map(
-      (b) => !Buffer.from(b).equals(Buffer.from(blockHash))
-    );
+    let list = [];
+
+    for (let i = 0; i < blocksInTransit.length; i++) {
+      if(blocksInTransit[i] !== blockHash){
+        list.push(blocksInTransit[i])
+      }
+    }
+
+    const newInTransit = list;
+
+    console.log("newInTransit",newInTransit)
+
     blocksInTransit = newInTransit;
   }
 
@@ -277,7 +293,7 @@ function handleInv(request, chain) {
   }
 }
 
-function handleGetBlocks(request, chain) {
+async function handleGetBlocks(request, chain) {
 
   console.log("------------------handleGetBlocks-------------------------")
 
@@ -285,12 +301,12 @@ function handleGetBlocks(request, chain) {
 
   const payload = JSON.parse(request.slice(commandLength).toString());
 
-  const blocks = chain.getBlockHashes();
+  const blocks = await chain.getBlockHashes();
 
   sendInv(payload.AddrFrom, "block", blocks);
 }
 
-function handleGetData(request, chain) {
+async function handleGetData(request, chain) {
 
   console.log("------------------handleGetData-------------------------")
 
@@ -298,23 +314,22 @@ function handleGetData(request, chain) {
 
   const payload = JSON.parse(request.slice(commandLength).toString());
 
-  if (payload.Type === "block") {
-    chain
-      .getBlock(Buffer.from(payload.ID))
-      .then((block) => {
-        SendBlock(payload.AddrFrom, block);
-      })
-      .catch((err) => {
-        console.error(err);
-      });
-  }
+  
+  if (payload.kind === "block") {
 
-  if (payload.Type === "tx") {
-    const txID = Buffer.from(payload.ID).toString("hex");
+    console.log("getBlock ID",payload.id)
+    
+    let block = await chain.getBlock(payload.id)
+
+    sendBlock(payload.nodeAddress, block);
+
+  }else if (payload.kind === "tx") {
+
+    const txID = Buffer.from(payload.id).toString("hex");
     const tx = memoryPool[txID];
 
     if (tx) {
-      sendTx(payload.AddrFrom, tx);
+      sendTx(payload.nodeAddress, tx);
     } else {
       console.error(`Transaction ${txID} not found in memory pool`);
     }
@@ -332,14 +347,17 @@ async function handleTx(request, chain) {
 
   const tx = deserializeTransaction(payload.Transaction);
 
-  console.log("tx",tx)
-
   memoryPool[Buffer.from(tx.ID).toString("hex")] = tx;
 
   console.log(`${nodeAddress}, ${Object.keys(memoryPool).length}`);
 
   if (nodeAddress === KnownNodes[0]) {
     KnownNodes.forEach((node) => {
+
+      console.log("node",node)
+      console.log("payload",payload)
+
+
       if (node !== nodeAddress && node !== payload.AddrFrom) {
         sendInv(node, "tx", [tx.ID]);
       }
@@ -440,16 +458,16 @@ async function handleConnection(data, chain) {
       handleAddr(data);
       break;
     case "block":
-      handleBlock(data, chain);
+      await handleBlock(data, chain);
       break;
     case "inv":
       handleInv(data, chain);
       break;
     case "getblocks":
-      handleGetBlocks(data, chain);
+      await handleGetBlocks(data, chain);
       break;
     case "getdata":
-      handleGetData(data, chain);
+      await handleGetData(data, chain);
       break;
     case "tx":
       await handleTx(data, chain);
@@ -489,24 +507,22 @@ const startServer = async (nodeID, minerAddress,address) => {
     console.log("New connection established");
     
 
-    if (nodeAddress !== KnownNodes[0]) {
+    // if (nodeAddress !== KnownNodes[0]) {
 
-      console.log("----------------run here--------------------------")
+    //   console.log("----------------run here--------------------------")
       
-      const chain = new Blockchain(address, nodeID);
+    //   const chain = new Blockchain(address, nodeID);
   
-      await chain.continueBlockchain(address);
+    //   await chain.continueBlockchain(address);
   
-      await sendVersion(KnownNodes[0], chain);
+    //   await sendVersion(KnownNodes[0], chain);
   
-      await chain.closeDB();
-    }
+    //   await chain.closeDB();
+    // }
   
 
     socket.on("data", async (data) => {
       
-      console.log("datatatatatttatatatta");
-
       let chain = new Blockchain(address, nodeID);
 
       await chain.continueBlockchain(address);

@@ -70,7 +70,7 @@ class Blockchain {
 
   async addBlock(block) {
     try {
-      const txn = this.DB.batch();
+      const txn = await this.DB.batch();
 
       try {
         const blockExists = await this.DB.get(block.hash).catch(() => null);
@@ -78,20 +78,31 @@ class Blockchain {
         if (blockExists) {
           return;
         }
-      } catch (e) {
-        const blockData = serializeBlock(block);
-        await txn.put(block.hash, blockData);
 
-        const lastHash = await txn.get("lh");
-        const lastBlockData = await txn.get(lastHash);
-        const lastBlock = this.deserialize(lastBlockData);
+        const blockData = this.serialize(block);
 
-        if (!lastBlock || block.height > lastBlock.height) {
-          await txn.put("lh", block.hash);
-          this.LastHash = block.hash;
+        await txn.put(block.Hash, blockData);
+
+        let lastHash = await this.DB.get("lh").catch(() => '');
+        
+        console.log("lastHash",lastHash)
+
+        const lastBlockData = await this.DB.get(lastHash).catch(() => '');
+
+        console.log("lastBlockData",lastBlockData)
+
+        const lastBlock = lastBlockData ? this.deserialize(lastBlockData):'';
+
+        if (!lastBlock || block.Height > lastBlock.Height) {
+          await txn.put("lh", block.Hash);
+          this.LastHash = block.Hash;
         }
 
         await txn.write();
+
+
+      } catch (e) {
+        console.log("e",e)
       }
     } catch (error) {
       console.error("Error while adding block:", error);
@@ -432,6 +443,26 @@ class Blockchain {
         break;
       }
     }
+  }
+
+  async getBlockHashes(chain) {
+    let blocks = [];
+  
+    let currentHash = this.LastHash;
+
+    while (true) {
+      let block = this.deserialize(await this.DB.get(currentHash));
+
+      blocks.push(block.Hash);
+
+      currentHash = block.PrevHash;
+
+      if (block.PrevHash == "") {
+        break;
+      }
+    }
+  
+    return blocks;
   }
 
   
