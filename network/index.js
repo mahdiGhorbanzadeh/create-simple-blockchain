@@ -2,7 +2,7 @@ const net = require("net");
 const { Readable } = require("stream");
 const { Blockchain } = require("../blockchain");
 const { UTXOSet } = require("../utxo");
-const { deserializeTransaction } = require("../transaction");
+const { deserializeTransaction, Transaction, coinbaseTx } = require("../transaction");
 
 const COMMAND_LENGTH = 12;
 const VERSION = 1
@@ -162,9 +162,8 @@ function sendGetBlocks(address) {
 function sendTx(addr, tnx) {
   console.log("------------------sendTx-------------------------")
   
-  console.log("tnx",tnx);
   
-  const serializedTx = tnx.serialize();
+  const serializedTx = tnx.serialize ? tnx.serialize() : tnx;
 
   const data = {
     AddrFrom: nodeAddress,
@@ -325,7 +324,7 @@ async function handleGetData(request, chain) {
 
   }else if (payload.kind === "tx") {
 
-    const txID = Buffer.from(payload.id).toString("hex");
+    const txID = payload.id;
     const tx = memoryPool[txID];
 
     if (tx) {
@@ -338,8 +337,7 @@ async function handleGetData(request, chain) {
 
 async function handleTx(request, chain) {
 
-  console.log("------------------handleTx-------------------------")
-
+  console.log("------------------ handleTx -------------------------")
 
   const commandLength = 12;
 
@@ -347,25 +345,22 @@ async function handleTx(request, chain) {
 
   const tx = deserializeTransaction(payload.Transaction);
 
-  memoryPool[Buffer.from(tx.ID).toString("hex")] = tx;
+  memoryPool[tx.ID] = tx;
 
   console.log(`${nodeAddress}, ${Object.keys(memoryPool).length}`);
 
   if (nodeAddress === KnownNodes[0]) {
     KnownNodes.forEach((node) => {
-
-      console.log("node",node)
-      console.log("payload",payload)
-
-
       if (node !== nodeAddress && node !== payload.AddrFrom) {
         sendInv(node, "tx", [tx.ID]);
       }
     });
-  } else {
-    if (Object.keys(memoryPool).length >= 2 && mineAddress) {
-      await mineTx(chain);
-    }
+  } 
+
+  console.log("Object.keys(memoryPool).length",Object.keys(memoryPool),Object.keys(memoryPool).length >= 2,mineAddress);
+
+  if (Object.keys(memoryPool).length >= 2 && mineAddress) {
+    await mineTx(chain);
   }
 
   console.log("------------------finish handleTx-------------------------")
@@ -382,7 +377,7 @@ async function mineTx(chain) {
   for (const id in memoryPool) {
     console.log(`tx: ${memoryPool[id].ID}`);
     const tx = memoryPool[id];
-    if (chain.VerifyTransaction(tx)) {
+    if (await chain.verifyTransaction(tx)) {
       txs.push(tx);
     }
   }
@@ -392,17 +387,23 @@ async function mineTx(chain) {
     return;
   }
 
-  const cbTx = chain.CoinbaseTx(mineAddress, "");
+  const cbTx = coinbaseTx(mineAddress, "");
+
   txs.push(cbTx);
 
   const newBlock = await chain.mineBlock(txs);
-  const UTXOSet = new chain.UTXOSet(chain);
-  await UTXOSet.Reindex();
+
+  console.log("newBlock",newBlock)
+
+  const utxo = new UTXOSet(chain);
+  
+  await utxo.reIndex();
 
   console.log("New Block mined");
 
   for (const tx of txs) {
-    const txID = Buffer.from(tx.ID).toString("hex");
+    console.log("tx for delete from memory pool",tx)
+    const txID = tx.ID;
     delete memoryPool[txID];
   }
 
@@ -433,7 +434,6 @@ async function handleVersion(request, chain) {
 
 
   if (bestHeight < otherHeight) {
-    console.log("sendGetBlocks")
     await sendGetBlocks(payload.AddrFrom);
   } else if (bestHeight > otherHeight) {
     await sendVersion(payload.AddrFrom, chain);

@@ -46,7 +46,11 @@ class Transaction {
 }
 
 function deserializeTransaction(data){
-    return JSON.parse(data);
+    try {
+        return JSON.parse(data);        
+    } catch (error) {
+        return data
+    }
 }
 
 

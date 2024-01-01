@@ -186,10 +186,9 @@ class Blockchain {
       console.error(error);
     }
 
-    let tx = coinbaseTx(this.Miner, "");
 
     let newBlock = this.createBlock(
-      [tx, ...txs],
+      txs,
       this.LastHash,
       lastHeight + 1
     );
@@ -199,6 +198,8 @@ class Blockchain {
     this.DB.put(LH_KEY, newBlock.Hash);
 
     this.DB.put(newBlock.Hash, this.serialize(newBlock));
+
+    return newBlock;
   }
 
   serialize(block) {
@@ -383,9 +384,13 @@ class Blockchain {
   }
 
   async verifyTransaction(tx) {
+
+    console.log("tx",tx)
+    
     if (isCoinBaseTx(tx)) {
       return true;
     }
+
     let prevTXs = {};
 
     for (let i = 0; i < tx.TxInputs.length; i++) {
