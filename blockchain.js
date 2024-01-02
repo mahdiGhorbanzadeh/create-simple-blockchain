@@ -28,7 +28,6 @@ class Blockchain {
         let cbtx = coinbaseTx(address, "");
         let block = this.createBlock([cbtx], "", 1);
 
-        console.log("block.Hash", this.serialize(block));
         console.log("block.LH_KEY", LH_KEY);
 
         this.DB.put(block.Hash, this.serialize(block));
@@ -195,6 +194,8 @@ class Blockchain {
 
     this.LastHash = newBlock.Hash;
 
+    console.log("newBlock.Hash",newBlock.Hash);
+
     this.DB.put(LH_KEY, newBlock.Hash);
 
     this.DB.put(newBlock.Hash, this.serialize(newBlock));
@@ -232,6 +233,8 @@ class Blockchain {
     let UTXOs = {};
 
     let spentTXOs = {};
+
+    console.log("currentHash",currentHash)
 
     if (currentHash) {
       while (true) {
@@ -440,9 +443,9 @@ class Blockchain {
 
       console.log(".............................................");
 
-      console.log("Block", JSON.stringify(block, null, 2));
-
       currentHash = block.PrevHash;
+
+      console.log(`block ${block.Height}`,block)
 
       if (block.PrevHash == "") {
         break;

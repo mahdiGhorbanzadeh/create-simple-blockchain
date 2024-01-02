@@ -115,7 +115,11 @@ class UTXOSet {
   }
 
   async reIndex() {
+    
+
     const utxos = await this.blockchain.findUTXODB();
+
+    console.log("utxos",utxos)
 
     await this.deleteByPrefix(this.utxoPrefix);
 

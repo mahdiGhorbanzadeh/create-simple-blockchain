@@ -54,7 +54,7 @@ class CommandLine {
 
     await chain.continueBlockchain(address)
 
-    chain.iterate();
+    await chain.iterate();
 
     await chain.closeDB();
 

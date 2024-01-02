@@ -226,13 +226,11 @@ async function handleBlock(request, chain) {
 
   const block = blockData;
 
-  console.log("Received a new block! ",block);
+  console.log("Received a new block! ");
 
   await chain.addBlock(block);
 
   console.log(`Added block ${block.Hash}`);
-
-  console.log("blocksInTransit",blocksInTransit)
 
   if (blocksInTransit.length > 0) {
     const blockHash = blocksInTransit[0];
@@ -393,7 +391,7 @@ async function mineTx(chain) {
 
   const newBlock = await chain.mineBlock(txs);
 
-  console.log("newBlock",newBlock)
+  console.log("newBlock genrated")
 
   const utxo = new UTXOSet(chain);
   
