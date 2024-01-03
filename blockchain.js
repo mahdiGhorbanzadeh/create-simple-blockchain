@@ -30,9 +30,11 @@ class Blockchain {
 
         console.log("block.LH_KEY", LH_KEY);
 
-        this.DB.put(block.Hash, this.serialize(block));
-        this.DB.put(LH_KEY, block.Hash);
-        
+        await this.DB.put(block.Hash, this.serialize(block));
+        await this.DB.put(LH_KEY, block.Hash);
+
+        this.LastHash = block.Hash;
+
       }
     }
   }
@@ -195,6 +197,8 @@ class Blockchain {
     this.LastHash = newBlock.Hash;
 
     console.log("newBlock.Hash",newBlock.Hash);
+
+    console.log("------------------------newBlock",newBlock)
 
     this.DB.put(LH_KEY, newBlock.Hash);
 

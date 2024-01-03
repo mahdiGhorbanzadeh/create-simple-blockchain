@@ -141,7 +141,7 @@ function sendInv(address, kind, items) {
 }
 
 function sendGetData(address, kind, id) {
-  console.log("------------------sendGetData-------------------------")
+  console.log(`------------------ sendGetData ${kind} -------------------------`)
   const payload = GobEncode({ nodeAddress, kind, id });
   const request = Buffer.concat([cmdToBytes("getdata"), payload]);
 
@@ -400,7 +400,7 @@ async function mineTx(chain) {
   console.log("New Block mined");
 
   for (const tx of txs) {
-    console.log("tx for delete from memory pool",tx)
+    console.log("tx for delete from memory pool",tx.ID)
     const txID = tx.ID;
     delete memoryPool[txID];
   }
