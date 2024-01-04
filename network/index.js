@@ -2,10 +2,14 @@ const net = require("net");
 const { Readable } = require("stream");
 const { Blockchain } = require("../blockchain");
 const { UTXOSet } = require("../utxo");
-const { deserializeTransaction, Transaction, coinbaseTx } = require("../transaction");
+const {
+  deserializeTransaction,
+  Transaction,
+  coinbaseTx,
+} = require("../transaction");
 
 const COMMAND_LENGTH = 12;
-const VERSION = 1
+const VERSION = 1;
 
 let nodeAddress = "";
 let mineAddress = "";
@@ -126,7 +130,7 @@ function sendData(addr, data) {
 }
 
 function sendInv(address, kind, items) {
-  console.log("------------------sendInv-------------------------")
+  console.log("------------------sendInv-------------------------");
   const inventory = {
     AddrFrom: nodeAddress,
     Type: kind,
@@ -141,7 +145,9 @@ function sendInv(address, kind, items) {
 }
 
 function sendGetData(address, kind, id) {
-  console.log(`------------------ sendGetData ${kind} -------------------------`)
+  console.log(
+    `------------------ sendGetData ${kind} -------------------------`
+  );
   const payload = GobEncode({ nodeAddress, kind, id });
   const request = Buffer.concat([cmdToBytes("getdata"), payload]);
 
@@ -149,7 +155,7 @@ function sendGetData(address, kind, id) {
 }
 
 function sendGetBlocks(address) {
-  console.log("------------------sendGetBlocks-------------------------")
+  console.log("------------------sendGetBlocks-------------------------");
   const payload = JSON.stringify({ AddrFrom: nodeAddress });
   const request = Buffer.concat([
     cmdToBytes("getblocks"),
@@ -160,9 +166,8 @@ function sendGetBlocks(address) {
 }
 
 function sendTx(addr, tnx) {
-  console.log("------------------sendTx-------------------------")
-  
-  
+  console.log("------------------sendTx-------------------------");
+
   const serializedTx = tnx.serialize ? tnx.serialize() : tnx;
 
   const data = {
@@ -178,12 +183,12 @@ function sendTx(addr, tnx) {
 }
 
 async function sendVersion(addr, chain) {
-
-  console.log(`------------------ sendVersion ${addr}-------------------------`)
-
+  console.log(
+    `------------------ sendVersion ${addr}-------------------------`
+  );
 
   const bestHeight = await chain.getBestHeight();
-  
+
   const payload = JSON.stringify({
     Version: VERSION,
     BestHeight: bestHeight,
@@ -196,9 +201,7 @@ async function sendVersion(addr, chain) {
 }
 
 function handleAddr(request) {
-
-  console.log("------------------handleAddr-------------------------")
-
+  console.log("------------------handleAddr-------------------------");
 
   const commandLength = 12;
 
@@ -212,15 +215,13 @@ function handleAddr(request) {
 }
 
 async function handleBlock(request, chain) {
-
-  console.log("------------------handleBlock-------------------------")
-
+  console.log("------------------handleBlock-------------------------");
 
   const commandLength = 12;
 
   const payload = JSON.parse(request.slice(commandLength).toString());
 
-  console.log("payload",payload);
+  console.log("payload", payload);
 
   const blockData = payload.Block;
 
@@ -234,7 +235,7 @@ async function handleBlock(request, chain) {
 
   if (blocksInTransit.length > 0) {
     const blockHash = blocksInTransit[0];
-    
+
     sendGetData(payload.AddrFrom, "block", blockHash);
 
     blocksInTransit = blocksInTransit.slice(1);
@@ -245,9 +246,7 @@ async function handleBlock(request, chain) {
 }
 
 function handleInv(request, chain) {
-
-  console.log("------------------handleInv-------------------------")
-
+  console.log("------------------handleInv-------------------------");
 
   const commandLength = 12;
 
@@ -264,19 +263,17 @@ function handleInv(request, chain) {
 
     sendGetData(payload.AddrFrom, "block", blockHash);
 
-    console.log("blocksInTransit",blocksInTransit)
+    console.log("blocksInTransit", blocksInTransit);
 
     let list = [];
 
     for (let i = 0; i < blocksInTransit.length; i++) {
-      if(blocksInTransit[i] !== blockHash){
-        list.push(blocksInTransit[i])
+      if (blocksInTransit[i] !== blockHash) {
+        list.push(blocksInTransit[i]);
       }
     }
 
     const newInTransit = list;
-
-    console.log("newInTransit",newInTransit)
 
     blocksInTransit = newInTransit;
   }
@@ -291,8 +288,7 @@ function handleInv(request, chain) {
 }
 
 async function handleGetBlocks(request, chain) {
-
-  console.log("------------------handleGetBlocks-------------------------")
+  console.log("------------------handleGetBlocks-------------------------");
 
   const commandLength = 12;
 
@@ -304,24 +300,19 @@ async function handleGetBlocks(request, chain) {
 }
 
 async function handleGetData(request, chain) {
-
-  console.log("------------------handleGetData-------------------------")
+  console.log("------------------handleGetData-------------------------");
 
   const commandLength = 12;
 
   const payload = JSON.parse(request.slice(commandLength).toString());
 
-  
   if (payload.kind === "block") {
+    console.log("getBlock ID", payload.id);
 
-    console.log("getBlock ID",payload.id)
-    
-    let block = await chain.getBlock(payload.id)
+    let block = await chain.getBlock(payload.id);
 
     sendBlock(payload.nodeAddress, block);
-
-  }else if (payload.kind === "tx") {
-
+  } else if (payload.kind === "tx") {
     const txID = payload.id;
     const tx = memoryPool[txID];
 
@@ -334,8 +325,7 @@ async function handleGetData(request, chain) {
 }
 
 async function handleTx(request, chain) {
-
-  console.log("------------------ handleTx -------------------------")
+  console.log("------------------ handleTx -------------------------");
 
   const commandLength = 12;
 
@@ -347,28 +337,28 @@ async function handleTx(request, chain) {
 
   console.log(`${nodeAddress}, ${Object.keys(memoryPool).length}`);
 
-  if (nodeAddress === KnownNodes[0]) {
-    KnownNodes.forEach((node) => {
-      if (node !== nodeAddress && node !== payload.AddrFrom) {
-        sendInv(node, "tx", [tx.ID]);
-      }
-    });
-  } 
+  KnownNodes.forEach((node) => {
+    if (node !== nodeAddress && node !== payload.AddrFrom) {
+      sendInv(node, "tx", [tx.ID]);
+    }
+  });
 
-  console.log("Object.keys(memoryPool).length",Object.keys(memoryPool),Object.keys(memoryPool).length >= 2,mineAddress);
+  console.log(
+    "Object.keys(memoryPool).length",
+    Object.keys(memoryPool),
+    Object.keys(memoryPool).length >= 2,
+    mineAddress
+  );
 
   if (Object.keys(memoryPool).length >= 2 && mineAddress) {
     await mineTx(chain);
   }
 
-  console.log("------------------finish handleTx-------------------------")
-
+  console.log("------------------finish handleTx-------------------------");
 }
 
 async function mineTx(chain) {
-
-  console.log("------------------mineTx-------------------------")
-
+  console.log("------------------mineTx-------------------------");
 
   const txs = [];
 
@@ -391,16 +381,16 @@ async function mineTx(chain) {
 
   const newBlock = await chain.mineBlock(txs);
 
-  console.log("newBlock genrated")
+  console.log("newBlock genrated");
 
   const utxo = new UTXOSet(chain);
-  
+
   await utxo.reIndex();
 
   console.log("New Block mined");
 
   for (const tx of txs) {
-    console.log("tx for delete from memory pool",tx.ID)
+    console.log("tx for delete from memory pool", tx.ID);
     const txID = tx.ID;
     delete memoryPool[txID];
   }
@@ -417,19 +407,17 @@ async function mineTx(chain) {
 }
 
 async function handleVersion(request, chain) {
-
-  console.log("------------------handleVersion-------------------------")
+  console.log("------------------handleVersion-------------------------");
 
   const payload = JSON.parse(request.slice(COMMAND_LENGTH).toString());
 
   const bestHeight = await chain.getBestHeight();
 
-  console.log("bestHeight",bestHeight)
+  console.log("bestHeight", bestHeight);
 
   const otherHeight = payload.BestHeight;
 
-  console.log("otherHeight",payload , otherHeight)
-
+  console.log("otherHeight", payload, otherHeight);
 
   if (bestHeight < otherHeight) {
     await sendGetBlocks(payload.AddrFrom);
@@ -443,9 +431,7 @@ async function handleVersion(request, chain) {
 }
 
 async function handleConnection(data, chain) {
-
-  console.log("------------------handleConnection-------------------------")
-
+  console.log("------------------handleConnection-------------------------");
 
   const commandLength = 12;
   const command = bytesToCmd(data.slice(0, commandLength));
@@ -478,19 +464,15 @@ async function handleConnection(data, chain) {
   }
 }
 
-const startServer = async (nodeID, minerAddress,address) => {
-
-  console.log("------------------startServer-------------------------")
-
+const startServer = async (nodeID, minerAddress, address) => {
+  console.log("------------------startServer-------------------------");
 
   nodeAddress = `localhost:${nodeID}`;
   mineAddress = minerAddress;
 
-
   if (nodeAddress !== KnownNodes[0]) {
+    console.log("----------------run here--------------------------");
 
-    console.log("----------------run here--------------------------")
-    
     const chain = new Blockchain(address, nodeID);
 
     await chain.continueBlockchain(address);
@@ -500,27 +482,23 @@ const startServer = async (nodeID, minerAddress,address) => {
     await chain.closeDB();
   }
 
-
-  const server = net.createServer(async(socket) => {
+  const server = net.createServer(async (socket) => {
     console.log("New connection established");
-    
 
     // if (nodeAddress !== KnownNodes[0]) {
 
     //   console.log("----------------run here--------------------------")
-      
+
     //   const chain = new Blockchain(address, nodeID);
-  
+
     //   await chain.continueBlockchain(address);
-  
+
     //   await sendVersion(KnownNodes[0], chain);
-  
+
     //   await chain.closeDB();
     // }
-  
 
     socket.on("data", async (data) => {
-      
       let chain = new Blockchain(address, nodeID);
 
       await chain.continueBlockchain(address);
@@ -528,7 +506,6 @@ const startServer = async (nodeID, minerAddress,address) => {
       await handleConnection(data, chain);
 
       await chain.closeDB();
-
     });
 
     socket.on("error", (err) => {
@@ -544,7 +521,7 @@ const startServer = async (nodeID, minerAddress,address) => {
     console.error("Server error:", err);
   });
 
-  server.listen(nodeID,"localhost", () => {
+  server.listen(nodeID, "localhost", () => {
     console.log(`Server running on localhost:${nodeID}`);
   });
 };

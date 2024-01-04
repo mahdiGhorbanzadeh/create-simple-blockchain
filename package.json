@@ -6,6 +6,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "husky": {
+    "hooks": {
+      "pre-commit": "pretty-quick --staged"
+    }
+  },
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -19,5 +24,8 @@
     "fs": "^0.0.1-security",
     "js-sha256": "^0.10.1",
     "level": "^8.0.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.1.1"
   }
 }

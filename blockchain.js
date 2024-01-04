@@ -21,7 +21,7 @@ class Blockchain {
       await this.openDB();
 
       let res = await this.DB.get(LH_KEY);
-      
+
       this.LastHash = res;
     } catch (e) {
       if (e.code == "LEVEL_NOT_FOUND") {
@@ -34,13 +34,11 @@ class Blockchain {
         await this.DB.put(LH_KEY, block.Hash);
 
         this.LastHash = block.Hash;
-
       }
     }
   }
 
-  async continueBlockchain(){
-
+  async continueBlockchain() {
     await this.openDB();
 
     try {
@@ -48,10 +46,9 @@ class Blockchain {
       this.LastHash = res;
     } catch (e) {
       if (e.code == "LEVEL_NOT_FOUND") {
-        this.LastHash = '';
+        this.LastHash = "";
       }
     }
-
   }
 
   createBlock(txs, prevHash, height) {
@@ -74,7 +71,7 @@ class Blockchain {
       const txn = await this.DB.batch();
 
       try {
-        const blockExists = await this.DB.get(block.hash).catch(() => null);
+        const blockExists = await this.DB.get(block.Hash).catch(() => null);
 
         if (blockExists) {
           return;
@@ -84,15 +81,15 @@ class Blockchain {
 
         await txn.put(block.Hash, blockData);
 
-        let lastHash = await this.DB.get("lh").catch(() => '');
-        
-        console.log("lastHash",lastHash)
+        let lastHash = await this.DB.get("lh").catch(() => "");
 
-        const lastBlockData = await this.DB.get(lastHash).catch(() => '');
+        console.log("lastHash", lastHash);
 
-        console.log("lastBlockData",lastBlockData)
+        const lastBlockData = await this.DB.get(lastHash).catch(() => "");
 
-        const lastBlock = lastBlockData ? this.deserialize(lastBlockData):'';
+        console.log("lastBlockData", lastBlockData);
+
+        const lastBlock = lastBlockData ? this.deserialize(lastBlockData) : "";
 
         if (!lastBlock || block.Height > lastBlock.Height) {
           await txn.put("lh", block.Hash);
@@ -100,10 +97,8 @@ class Blockchain {
         }
 
         await txn.write();
-
-
       } catch (e) {
-        console.log("e",e)
+        console.log("e", e);
       }
     } catch (error) {
       console.error("Error while adding block:", error);
@@ -120,7 +115,6 @@ class Blockchain {
 
       return lastBlock.Height;
     } catch (error) {
-
       if (error.code == "LEVEL_NOT_FOUND") {
         return 0;
       }
@@ -187,18 +181,13 @@ class Blockchain {
       console.error(error);
     }
 
-
-    let newBlock = this.createBlock(
-      txs,
-      this.LastHash,
-      lastHeight + 1
-    );
+    let newBlock = this.createBlock(txs, this.LastHash, lastHeight + 1);
 
     this.LastHash = newBlock.Hash;
 
-    console.log("newBlock.Hash",newBlock.Hash);
+    console.log("newBlock.Hash", newBlock.Hash);
 
-    console.log("------------------------newBlock",newBlock)
+    console.log("------------------------newBlock", newBlock);
 
     this.DB.put(LH_KEY, newBlock.Hash);
 
@@ -238,7 +227,7 @@ class Blockchain {
 
     let spentTXOs = {};
 
-    console.log("currentHash",currentHash)
+    console.log("currentHash", currentHash);
 
     if (currentHash) {
       while (true) {
@@ -391,9 +380,8 @@ class Blockchain {
   }
 
   async verifyTransaction(tx) {
+    console.log("tx", tx);
 
-    console.log("tx",tx)
-    
     if (isCoinBaseTx(tx)) {
       return true;
     }
@@ -449,7 +437,7 @@ class Blockchain {
 
       currentHash = block.PrevHash;
 
-      console.log(`block ${block.Height}`,block)
+      console.log(`block ${block.Height}`, block);
 
       if (block.PrevHash == "") {
         break;
@@ -459,7 +447,7 @@ class Blockchain {
 
   async getBlockHashes(chain) {
     let blocks = [];
-  
+
     let currentHash = this.LastHash;
 
     while (true) {
@@ -473,23 +461,22 @@ class Blockchain {
         break;
       }
     }
-  
+
     return blocks;
   }
 
-  
-  async openDB() {    
-    this.DB = await createDB(this.Node)  
+  async openDB() {
+    this.DB = await createDB(this.Node);
   }
 
-  async closeDB(){
+  async closeDB() {
     await new Promise((resolve, reject) => {
       this.DB.close((err) => {
         if (err) {
-          console.error('Error closing the database:', err);
+          console.error("Error closing the database:", err);
           reject(err);
         } else {
-          console.log('Database closed successfully');
+          console.log("Database closed successfully");
           closeDBRes();
           resolve();
         }
