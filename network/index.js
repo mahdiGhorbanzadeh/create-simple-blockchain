@@ -16,6 +16,7 @@ let mineAddress = "";
 let KnownNodes = ["localhost:3000"];
 let blocksInTransit = [];
 let memoryPool = {};
+let reorganizationmode = false;
 
 class Addr {
   constructor(addrList = []) {
@@ -211,7 +212,7 @@ function handleAddr(request) {
 
   console.log(`There are ${knownNodes.length} known nodes`);
 
-  RequestBlocks();
+  requestBlocks();
 }
 
 async function handleBlock(request, chain) {
@@ -229,7 +230,13 @@ async function handleBlock(request, chain) {
 
   console.log("Received a new block! ");
 
-  await chain.addBlock(block);
+  let res = await chain.addBlock(block);
+
+  if (res == "fork") {
+    reorganizationmode = true;
+    blocksInTransit = [];
+    sendVersion(payload.addrFrom, chain);
+  }
 
   console.log(`Added block ${block.Hash}`);
 

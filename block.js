@@ -1,31 +1,40 @@
-
-const {sha256} = require('js-sha256');
-const { newMerkleTree } = require('./merkle');
+const { sha256 } = require("js-sha256");
+const { newMerkleTree } = require("./merkle");
+const crypto = require("crypto");
 
 class Block {
-    constructor(Timestamp,Hash,Transactions,PrevHash,Nonce,Height){
-        this.Timestamp = Timestamp;
-        this.Hash = Hash;
-        this.Transactions = Transactions;
-        this.PrevHash =PrevHash;
-        this.Nonce = Nonce; 
-        this.Height = Height;
-    }
+  constructor(Timestamp, Hash, Transactions, PrevHash, Nonce, Height) {
+    this.Hash = Hash;
 
-    hashTransactions(){
-        let hashes = [];
-        let hash = ''
+    this.Header = {
+      Timestamp: Timestamp,
+      PrevHash: PrevHash,
+      Nonce: Nonce,
+      Height: Height,
+      MerkleRoot: null,
+    };
 
-        
-        this.Transactions.map(item=>{
-            hashes.push(item.ID);
-        })
+    this.Transactions = Transactions;
+  }
 
-        let tree = newMerkleTree(hashes);
-        
-        return hash;
-    }
+  hashTransactions() {
+    let hashes = [];
+
+    this.Transactions.map((item) => {
+      hashes.push(item.ID);
+    });
+
+    let tree = newMerkleTree(hashes);
+
+    this.Header.MerkleRoot = tree.rootNode.data;
+
+    const blockHash = crypto
+      .createHash("sha256")
+      .update(JSON.stringify(this.Header))
+      .digest("hex");
+
+    return blockHash;
+  }
 }
 
-
-module.exports = { Block }
+module.exports = { Block };

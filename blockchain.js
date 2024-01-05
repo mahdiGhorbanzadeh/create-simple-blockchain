@@ -9,6 +9,7 @@ const {
   usesKey,
   isLockedWithKey,
 } = require("./transaction");
+
 const { sha256 } = require("bitcoinjs-lib/src/crypto");
 class Blockchain {
   constructor(address, node) {
@@ -56,7 +57,7 @@ class Blockchain {
     let pow = new Proof(block);
     let res = pow.run();
 
-    block.Nonce = res.nonce;
+    block.Header.Nonce = res.nonce;
     block.Hash = res.hash;
 
     return block;
@@ -71,7 +72,7 @@ class Blockchain {
       const txn = await this.DB.batch();
 
       try {
-        const blockExists = await this.DB.get(block.Hash).catch(() => null);
+        const blockExists = await this.DB.get(block.hash).catch(() => null);
 
         if (blockExists) {
           return;
@@ -91,9 +92,15 @@ class Blockchain {
 
         const lastBlock = lastBlockData ? this.deserialize(lastBlockData) : "";
 
-        if (!lastBlock || block.Height > lastBlock.Height) {
+        if (
+          (!lastBlock && block.Header.Height == 1) ||
+          block.Header.Height == lastBlock.Header.Height + 1
+        ) {
           await txn.put("lh", block.Hash);
           this.LastHash = block.Hash;
+        } else {
+          //---------------->fork created
+          return "fork";
         }
 
         await txn.write();
@@ -113,7 +120,7 @@ class Blockchain {
 
       const lastBlock = this.deserialize(lastBlockData);
 
-      return lastBlock.Height;
+      return lastBlock.Header.Height;
     } catch (error) {
       if (error.code == "LEVEL_NOT_FOUND") {
         return 0;
@@ -135,7 +142,7 @@ class Blockchain {
 
       if (blockData) {
         const block = this.deserialize(blockData);
-        currentHash = block.PrevHash;
+        currentHash = block.Header.PrevHash;
       } else {
         break;
       }
@@ -176,7 +183,7 @@ class Blockchain {
       lastHash = await this.DB.get("lh");
       const lastBlockData = await this.DB.get(lastHash);
       const lastBlock = this.deserialize(lastBlockData);
-      lastHeight = lastBlock.Height;
+      lastHeight = lastBlock.Header.Height;
     } catch (error) {
       console.error(error);
     }
@@ -272,9 +279,9 @@ class Blockchain {
           }
         });
 
-        currentHash = block.PrevHash;
+        currentHash = block.Header.PrevHash;
 
-        if (block.PrevHash == "") {
+        if (block.Header.PrevHash == "") {
           break;
         }
       }
@@ -357,9 +364,9 @@ class Blockchain {
         }
       });
 
-      currentHash = block.PrevHash;
+      currentHash = block.Header.PrevHash;
 
-      if (block.PrevHash == "") {
+      if (block.Header.PrevHash == "") {
         break;
       }
     }
@@ -417,9 +424,9 @@ class Blockchain {
         break;
       }
 
-      currentHash = block.PrevHash;
+      currentHash = block.Header.PrevHash;
 
-      if (block.PrevHash == "") {
+      if (block.Header.PrevHash == "") {
         break;
       }
     }
@@ -435,11 +442,11 @@ class Blockchain {
 
       console.log(".............................................");
 
-      currentHash = block.PrevHash;
+      currentHash = block.Header.PrevHash;
 
-      console.log(`block ${block.Height}`, block);
+      console.log(`block ${block.Header.Height}`, block);
 
-      if (block.PrevHash == "") {
+      if (block.Header.PrevHash == "") {
         break;
       }
     }
@@ -455,9 +462,9 @@ class Blockchain {
 
       blocks.push(block.Hash);
 
-      currentHash = block.PrevHash;
+      currentHash = block.Header.PrevHash;
 
-      if (block.PrevHash == "") {
+      if (block.Header.PrevHash == "") {
         break;
       }
     }
