@@ -3,7 +3,15 @@ const { newMerkleTree } = require("./merkle");
 const crypto = require("crypto");
 
 class Block {
-  constructor(Timestamp, Hash, Transactions, PrevHash, Nonce, Height) {
+  constructor(
+    Timestamp,
+    Hash,
+    Transactions,
+    PrevHash,
+    Nonce,
+    Height,
+    MerkleRoot = null
+  ) {
     this.Hash = Hash;
 
     this.Header = {
@@ -11,7 +19,7 @@ class Block {
       PrevHash: PrevHash,
       Nonce: Nonce,
       Height: Height,
-      MerkleRoot: null,
+      MerkleRoot: MerkleRoot,
     };
 
     this.Transactions = Transactions;
@@ -20,13 +28,15 @@ class Block {
   hashTransactions() {
     let hashes = [];
 
-    this.Transactions.map((item) => {
-      hashes.push(item.ID);
-    });
+    if (!this.Header.MerkleRoot) {
+      this.Transactions.map((item) => {
+        hashes.push(item.ID);
+      });
 
-    let tree = newMerkleTree(hashes);
+      let tree = newMerkleTree(hashes);
 
-    this.Header.MerkleRoot = tree.rootNode.data;
+      this.Header.MerkleRoot = tree.rootNode.data;
+    }
 
     const blockHash = crypto
       .createHash("sha256")

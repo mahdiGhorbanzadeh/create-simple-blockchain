@@ -44,6 +44,14 @@ class Proof {
     return hash === this.block.Hash;
   }
 
+  validateProof() {
+    if (this.block.Header.Hash.startsWith(this.returnDifficulty(), 0)) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
   toHex(nonce) {
     return nonce.toString(16);
   }

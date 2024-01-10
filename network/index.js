@@ -15,6 +15,7 @@ let nodeAddress = "";
 let mineAddress = "";
 let KnownNodes = ["localhost:3000"];
 let blocksInTransit = [];
+let reorganizationHeaders = [];
 let memoryPool = {};
 let reorganizationmode = false;
 
@@ -166,6 +167,23 @@ function sendGetBlocks(address) {
   sendData(address, request);
 }
 
+function sendGetHeaders(address, fromHeaderHash, stopHeaderHash) {
+  console.log("------------------sendGetHeaders-------------------------");
+
+  const payload = JSON.stringify({
+    AddrFrom: nodeAddress,
+    FromHeaderHash: fromHeaderHash,
+    StopHeaderHash: stopHeaderHash,
+  });
+
+  const request = Buffer.concat([
+    cmdToBytes("getheaders"),
+    Buffer.from(payload),
+  ]);
+
+  sendData(address, request);
+}
+
 function sendTx(addr, tnx) {
   console.log("------------------sendTx-------------------------");
 
@@ -252,7 +270,7 @@ async function handleBlock(request, chain) {
   }
 }
 
-function handleInv(request, chain) {
+async function handleInv(request, chain) {
   console.log("------------------handleInv-------------------------");
 
   const commandLength = 12;
@@ -262,6 +280,23 @@ function handleInv(request, chain) {
   console.log(
     `Received inventory with ${payload.Items.length} ${payload.Type}`
   );
+
+  if (payload.Type === "header") {
+    reorganizationHeaders = reorganizationHeaders.concat(payload.Items);
+    if (payload.Items.length == 100) {
+      sendGetHeaders(
+        payload.AddrFrom,
+        payload.Items[payload.Items.length - 1].Hash,
+        ""
+      );
+    } else {
+      // try{
+
+      // }ca
+      await chain.checkSyncNodeHeaders(reorganizationHeaders);
+      await chain.findCommonPointWithSyncNode(reorganizationHeaders);
+    }
+  }
 
   if (payload.Type === "block") {
     blocksInTransit = payload.Items;
@@ -304,6 +339,21 @@ async function handleGetBlocks(request, chain) {
   const blocks = await chain.getBlockHashes();
 
   sendInv(payload.AddrFrom, "block", blocks);
+}
+
+async function handleGetHeaders(request, chain) {
+  console.log("------------------handleGetHeaders-------------------------");
+
+  const commandLength = 12;
+
+  const payload = JSON.parse(request.slice(commandLength).toString());
+
+  const headers = await chain.getBlockHeaders(
+    payload.FromHeaderHash,
+    payload.StopHeaderHash
+  );
+
+  sendInv(payload.AddrFrom, "header", headers);
 }
 
 async function handleGetData(request, chain) {
@@ -427,7 +477,11 @@ async function handleVersion(request, chain) {
   console.log("otherHeight", payload, otherHeight);
 
   if (bestHeight < otherHeight) {
-    await sendGetBlocks(payload.AddrFrom);
+    await sendGetHeaders(
+      payload.AddrFrom,
+      await chain.getBlockWithHeight(0),
+      ""
+    );
   } else if (bestHeight > otherHeight) {
     await sendVersion(payload.AddrFrom, chain);
   }
@@ -452,7 +506,10 @@ async function handleConnection(data, chain) {
       await handleBlock(data, chain);
       break;
     case "inv":
-      handleInv(data, chain);
+      await handleInv(data, chain);
+      break;
+    case "getheaders":
+      await handleGetHeaders(data, chain);
       break;
     case "getblocks":
       await handleGetBlocks(data, chain);

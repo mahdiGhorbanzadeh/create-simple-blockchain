@@ -29,9 +29,10 @@ class Blockchain {
         let cbtx = coinbaseTx(address, "");
         let block = this.createBlock([cbtx], "", 1);
 
-        console.log("block.LH_KEY", LH_KEY);
+        console.log("block.LH_KEY ", LH_KEY);
 
         await this.DB.put(block.Hash, this.serialize(block));
+        await this.DB.put(block.Header.Height, block.Hash);
         await this.DB.put(LH_KEY, block.Hash);
 
         this.LastHash = block.Hash;
@@ -151,6 +152,66 @@ class Blockchain {
     return blocks;
   }
 
+  async getBlockHeaders(fromHeaderHash, stopHeaderHash, number = 100) {
+    let count = 0;
+    let height = 0;
+    let nowHash = fromHeaderHash;
+
+    let headers = [];
+
+    if (fromHeaderHash) {
+      try {
+        let block = this.deserialize(await this.DB.get(fromHeaderHash));
+        height = block.Header.Height;
+      } catch (e) {}
+    }
+
+    while (nowHash == stopHeaderHash || count == number) {
+      try {
+        let hash = await this.DB.get(`block_${height}`);
+        let block = this.deserialize(await this.DB.get(hash));
+
+        count += 1;
+        height += 1;
+        nowHash = block.Header.Hash;
+
+        headers.push(block.Header);
+      } catch {}
+
+      return headers;
+    }
+  }
+
+  async getBlockWithHeight(height) {
+    return await this.DB.get(`block_${height}`).catch(() => null);
+  }
+
+  async checkSyncNodeHeaders(headers) {
+    let prevHash = "";
+
+    for (let i = 0; i < headers.length; i++) {
+      let block = new Block(
+        headers[i].Timestamp,
+        headers[i].Hash,
+        [],
+        headers[i].PrevHash,
+        headers[i].Nonce,
+        headers[i].Height
+      );
+
+      let proof = new Proof(block);
+
+      if (
+        header.PrevHash != prevHash ||
+        !proof.validateProof() ||
+        !proof.validate()
+      ) {
+        throw new Error("Error checking sync node headers");
+      }
+
+      prevHash = block.Header.PrevHash;
+    }
+  }
   async getBlock(blockHash) {
     try {
       const blockData = await this.DB.get(blockHash);
