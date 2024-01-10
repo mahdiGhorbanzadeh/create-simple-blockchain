@@ -154,7 +154,7 @@ class Blockchain {
 
   async getBlockHeaders(fromHeaderHash, stopHeaderHash, number = 100) {
     let count = 0;
-    let height = 0;
+    let height = 1;
     let nowHash = fromHeaderHash;
 
     let headers = [];
@@ -177,14 +177,40 @@ class Blockchain {
 
         headers.push(block.Header);
       } catch {}
-
-      return headers;
     }
+
+    return headers;
   }
 
   async getBlockWithHeight(height) {
     return await this.DB.get(`block_${height}`).catch(() => null);
   }
+
+  async findCommonPointWithSyncNode(headers) {
+    let height = 1;
+
+    for (let i = 0; i < headers.length; i++) {
+      let hash = await this.DB.get(`block_${height}`);
+
+      if (hash != header[i].hash) {
+        return height;
+      }
+
+      height += 1;
+    }
+
+    return height;
+  }
+
+  async getHeadersHashFromHeaders(headers) {
+    let headerHashs = [];
+
+    for (let i = 0; i < headers.length; i++) {
+      headerHashs.push(headers[i].Hash);
+    }
+  }
+
+  // async
 
   async checkSyncNodeHeaders(headers) {
     let prevHash = "";
@@ -212,6 +238,7 @@ class Blockchain {
       prevHash = block.Header.PrevHash;
     }
   }
+
   async getBlock(blockHash) {
     try {
       const blockData = await this.DB.get(blockHash);

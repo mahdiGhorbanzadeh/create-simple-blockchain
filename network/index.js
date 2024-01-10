@@ -156,9 +156,14 @@ function sendGetData(address, kind, id) {
   sendData(address, request);
 }
 
-function sendGetBlocks(address) {
+function sendGetBlocks(address, headers) {
   console.log("------------------sendGetBlocks-------------------------");
-  const payload = JSON.stringify({ AddrFrom: nodeAddress });
+
+  const payload = JSON.stringify({
+    AddrFrom: nodeAddress,
+    HeaderHash: headers,
+  });
+
   const request = Buffer.concat([
     cmdToBytes("getblocks"),
     Buffer.from(payload),
@@ -290,11 +295,21 @@ async function handleInv(request, chain) {
         ""
       );
     } else {
-      // try{
-
-      // }ca
       await chain.checkSyncNodeHeaders(reorganizationHeaders);
-      await chain.findCommonPointWithSyncNode(reorganizationHeaders);
+
+      let height = await chain.findCommonPointWithSyncNode(
+        reorganizationHeaders
+      );
+
+      reorganizationHeaders = reorganizationHeaders.slice(height - 1);
+
+      blocksInTransit = await chain.getHeadersHashFromHeaders(
+        reorganizationHeaders
+      );
+
+      sendGetBlocks(KnownNodes[0], blocksInTransit.slice(16));
+
+      reorganizationHeaders = [];
     }
   }
 
@@ -304,8 +319,6 @@ async function handleInv(request, chain) {
     const blockHash = payload.Items[0];
 
     sendGetData(payload.AddrFrom, "block", blockHash);
-
-    console.log("blocksInTransit", blocksInTransit);
 
     let list = [];
 
