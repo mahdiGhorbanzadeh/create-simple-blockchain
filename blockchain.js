@@ -68,12 +68,16 @@ class Blockchain {
     return BigInt(new Date().getTime()).toString();
   }
 
-  async addBlock(block) {
+  async addBlock(blocks) {
     try {
-      const txn = await this.DB.batch();
+      for (let i = 0; i < blocks.length; i++) {
+        const txn = await this.DB.batch();
 
-      try {
-        const blockExists = await this.DB.get(block.hash).catch(() => null);
+        const block = blocks[i];
+
+        const blockExists = await this.DB.get(block.Header.Hash).catch(
+          () => null
+        );
 
         if (blockExists) {
           return;
@@ -81,35 +85,26 @@ class Blockchain {
 
         const blockData = this.serialize(block);
 
-        await txn.put(block.Hash, blockData);
-
         let lastHash = await this.DB.get("lh").catch(() => "");
 
-        console.log("lastHash", lastHash);
-
         const lastBlockData = await this.DB.get(lastHash).catch(() => "");
-
-        console.log("lastBlockData", lastBlockData);
 
         const lastBlock = lastBlockData ? this.deserialize(lastBlockData) : "";
 
         if (
-          (!lastBlock && block.Header.Height == 1) ||
-          block.Header.Height == lastBlock.Header.Height + 1
+          (!lastBlock && blockData.Header.Height == 1) ||
+          blockData.Header.Height == lastBlock.Header.Height + 1
         ) {
-          await txn.put("lh", block.Hash);
-          this.LastHash = block.Hash;
+          await txn.put("lh", blockData.Header.Hash);
+          this.LastHash = blockData.Header.Hash;
         } else {
-          //---------------->fork created
           return "fork";
         }
 
         await txn.write();
-      } catch (e) {
-        console.log("e", e);
       }
-    } catch (error) {
-      console.error("Error while adding block:", error);
+    } catch (e) {
+      console.log("e", e);
     }
   }
 
@@ -239,20 +234,26 @@ class Blockchain {
     }
   }
 
-  async getBlock(blockHash) {
-    try {
-      const blockData = await this.DB.get(blockHash);
+  async getBlock(headerHashes) {
+    let blocks = [];
 
-      const block = this.deserialize(blockData);
+    for (let i = 0; i < headerHashes.length; i++) {
+      try {
+        const blockData = await this.DB.get(headerHashes[i]);
 
-      return block;
-    } catch (error) {
-      if (error.code == "LEVEL_NOT_FOUND") {
-        return null;
+        const block = this.deserialize(blockData);
+
+        blocks.push(block);
+      } catch (error) {
+        if (error.code == "LEVEL_NOT_FOUND") {
+          return null;
+        }
+
+        throw new Error("Error fetching block");
       }
-
-      throw new Error("Error fetching block");
     }
+
+    return blocks;
   }
 
   async mineBlock(txs) {
