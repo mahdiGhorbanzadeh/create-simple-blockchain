@@ -7,6 +7,8 @@ class UTXOSet {
     this.utxoPrefix = "UTXO-";
   }
 
+  async() {}
+
   async findSpendableOutputs(pubKeyHash, amount) {
     let unspentOuts = {};
     let accumulated = 0;
@@ -114,12 +116,17 @@ class UTXOSet {
     return counter;
   }
 
-  async reIndex() {
-    
+  async returnChain(height) {
+    const { UTXOs, spentTXOs } = await this.blockchain.findUTXODB(true);
 
+    console.log("UTXOs", UTXOs);
+    console.log("spentTXOs", spentTXOs);
+  }
+
+  async reIndex() {
     const utxos = await this.blockchain.findUTXODB();
 
-    console.log("utxos",utxos)
+    // console.log("utxos", utxos);
 
     await this.deleteByPrefix(this.utxoPrefix);
 

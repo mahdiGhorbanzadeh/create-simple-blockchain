@@ -298,6 +298,10 @@ async function handleInv(request, chain) {
         reorganizationHeaders
       );
 
+      const utxo = new UTXOSet(chain);
+
+      await utxo.reIndex();
+
       sendGetData(payload.AddrFrom, "block", blocksInTransit.slice(0, 16));
 
       reorganizationHeaders = [];

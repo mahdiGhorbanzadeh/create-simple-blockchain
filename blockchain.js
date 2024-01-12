@@ -316,18 +316,20 @@ class Blockchain {
     return UTXOs;
   }
 
-  async findUTXODB() {
+  async findUTXODB(returnSpend = false, height) {
     let currentHash = this.LastHash;
 
     let UTXOs = {};
 
     let spentTXOs = {};
 
-    console.log("currentHash", currentHash);
-
     if (currentHash) {
       while (true) {
         let block = this.deserialize(await this.DB.get(currentHash));
+
+        if (height && block.Header.Height == height) {
+          break;
+        }
 
         block.Transactions.map((tx) => {
           for (let i = 0; i < tx.TxOutputs.length; i++) {
@@ -336,8 +338,18 @@ class Blockchain {
             if (spentTXOs[tx.ID]) {
               let spendOuts = spentTXOs[tx.ID];
 
-              for (let j = 0; j < spendOuts.length; j++) {
-                if (spendOuts[j] == i) {
+              for (let j = 0; j < spentTXOs[tx.ID].length; j++) {
+                if (spentTXOs[tx.ID][j] == i) {
+                  const index = spentTXOs[tx.ID].indexOf(spentTXOs[tx.ID][j]);
+
+                  if (index > -1) {
+                    spentTXOs[tx.ID].splice(index, 1);
+                  }
+
+                  if (spentTXOs[tx.ID] && spentTXOs[tx.ID].length == 0) {
+                    delete spentTXOs[tx.ID];
+                  }
+
                   fail = true;
                   break;
                 }
@@ -363,7 +375,9 @@ class Blockchain {
                 spentTXOs[intxId] = [];
               }
 
-              spentTXOs[intxId].push(tx.TxInputs[j].Out);
+              if (!spentTXOs[intxId].includes(tx.TxInputs[j].Out)) {
+                spentTXOs[intxId].push(tx.TxInputs[j].Out);
+              }
             }
           }
         });
@@ -376,7 +390,11 @@ class Blockchain {
       }
     }
 
-    return UTXOs;
+    console.log("UTXOs", UTXOs);
+
+    console.log("spentTXOs", spentTXOs);
+
+    return returnSpend ? { UTXOs, spentTXOs } : UTXOs;
   }
 
   async findSpendableOutputs(pubKeyHash, amount) {
