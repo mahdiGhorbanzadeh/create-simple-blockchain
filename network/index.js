@@ -18,6 +18,8 @@ let blocksInTransit = [];
 let reorganizationHeaders = [];
 let memoryPool = {};
 let reorganizationmode = false;
+let intervalId;
+let isRunning = false;
 
 class Addr {
   constructor(addrList = []) {
@@ -429,18 +431,32 @@ async function handleTx(request, chain) {
     }
   });
 
-  console.log(
-    "Object.keys(memoryPool).length",
-    Object.keys(memoryPool),
-    Object.keys(memoryPool).length >= 2,
-    mineAddress
-  );
-
-  if (Object.keys(memoryPool).length >= 2 && mineAddress) {
-    await mineTx(chain);
-  }
-
   console.log("------------------finish handleTx-------------------------");
+}
+
+async function mineTxInterval(chain) {
+  intervalId = setInterval(async () => {
+    if (isRunning) {
+      console.log(
+        "---------------------------- start to mine ------------------------"
+      );
+      await mineTx(chain);
+
+      console.log(
+        "---------------------------- end mine ------------------------"
+      );
+    }
+  }, 2000);
+}
+
+function pauseFunction() {
+  isRunning = false;
+  console.log("mine paused.");
+}
+
+function resumeFunction() {
+  isRunning = true;
+  console.log("mine resumed.");
 }
 
 async function mineTx(chain) {
@@ -451,14 +467,12 @@ async function mineTx(chain) {
   for (const id in memoryPool) {
     console.log(`tx: ${memoryPool[id].ID}`);
     const tx = memoryPool[id];
+
+    console.log("txxxxxxxxxxxxxxxxxx", tx);
+
     if (await chain.verifyTransaction(tx)) {
       txs.push(tx);
     }
-  }
-
-  if (txs.length === 0) {
-    console.log("All Transactions are invalid");
-    return;
   }
 
   const cbTx = coinbaseTx(mineAddress, "");
@@ -485,10 +499,6 @@ async function mineTx(chain) {
     if (node !== nodeAddress) {
       sendInv(node, "block", [newBlock.Hash]);
     }
-  }
-
-  if (Object.keys(memoryPool).length > 0) {
-    await mineTx(chain);
   }
 }
 
@@ -564,7 +574,7 @@ const startServer = async (nodeID, minerAddress, address) => {
   nodeAddress = `localhost:${nodeID}`;
   mineAddress = minerAddress;
 
-  if (nodeAddress !== KnownNodes[0]) {
+  if (nodeAddress != KnownNodes[0]) {
     console.log("----------------run here--------------------------");
 
     const chain = new Blockchain(address, nodeID);
@@ -576,6 +586,13 @@ const startServer = async (nodeID, minerAddress, address) => {
     await sendVersion(KnownNodes[0], chain);
 
     await chain.closeDB();
+  } else {
+    const chain = new Blockchain(address, nodeID);
+
+    await chain.continueBlockchain(address);
+
+    mineTxInterval(chain);
+    resumeFunction();
   }
 
   const server = net.createServer(async (socket) => {

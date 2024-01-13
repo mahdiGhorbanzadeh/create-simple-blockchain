@@ -117,7 +117,7 @@ class UTXOSet {
   }
 
   async returnChain(height) {
-    const { UTXOs, spentTXOs } = await this.blockchain.findUTXODB(true);
+    const { UTXOs, spentTXOs } = await this.blockchain.findUTXODB(true, height);
 
     console.log("UTXOs", UTXOs);
     console.log("spentTXOs", spentTXOs);

@@ -8,7 +8,7 @@ const { newTransaction, coinbaseTx, getBalance } = require("./transaction");
 const { address } = require("bitcoinjs-lib");
 
 class CommandLine {
-  async startNode(nodeID, minerAddress,address) {
+  async startNode(nodeID, minerAddress, address) {
     console.log(`Starting Node ${nodeID}`);
 
     if (minerAddress) {
@@ -20,13 +20,13 @@ class CommandLine {
       }
     }
 
-    await startServer(nodeID, minerAddress,address);
+    await startServer(nodeID, minerAddress, address);
   }
 
   async reindexUTXO(address, nodeID) {
     const chain = new Blockchain(address, nodeID);
 
-    await chain.continueBlockchain(address)
+    await chain.continueBlockchain(address);
 
     const utxo = new UTXOSet(chain);
 
@@ -52,18 +52,17 @@ class CommandLine {
   async printChain(address, nodeID) {
     const chain = new Blockchain(address, nodeID);
 
-    await chain.continueBlockchain(address)
+    await chain.continueBlockchain(address);
 
     await chain.iterate();
 
     await chain.closeDB();
-
   }
 
   async createBlockChain(address, nodeID) {
     const chain = new Blockchain(address, nodeID);
 
-    await chain.initBlockchain(address)
+    await chain.initBlockchain(address);
 
     const utxo = new UTXOSet(chain);
 
@@ -78,7 +77,6 @@ class CommandLine {
     const chain = new Blockchain(address, nodeID);
 
     await chain.continueBlockchain(address);
-
 
     let utxo = new UTXOSet(chain);
 
@@ -109,7 +107,7 @@ class CommandLine {
     const tx = await newTransaction(from, to, amount, utxo, nodeID);
 
     await chain.closeDB();
-    
+
     if (mineNow) {
       const cbTx = coinbaseTx(from, "");
 
@@ -124,8 +122,17 @@ class CommandLine {
       console.log("send tx");
     }
 
-
     console.log("Success!");
+  }
+
+  async returnChain(address, nodeID) {
+    const chain = new Blockchain(address, nodeID);
+
+    await chain.continueBlockchain(address);
+
+    const utxo = new UTXOSet(chain);
+
+    await utxo.returnChain("");
   }
 }
 
@@ -138,7 +145,7 @@ program
   .option("-m, --miner <miner>", "Set miner address")
   .option("-a, --address <address>", "Set address")
   .action((options) => {
-    cli.startNode(options.nodeid, options.miner,options.address);
+    cli.startNode(options.nodeid, options.miner, options.address);
   });
 //-------> node ./cli.js startnode -n 3000 -m
 
@@ -168,6 +175,15 @@ program
   .option("-a, --address <address>", "Set address")
   .action((options) => {
     cli.printChain(options.address, options.nodeid);
+  });
+
+program
+  .command("returnchain")
+  .description("return chain")
+  .option("-n, --nodeid <nodeid>", "Set node ID")
+  .option("-a, --address <address>", "Set address")
+  .action((options) => {
+    cli.returnChain(options.address, options.nodeid);
   });
 
 program

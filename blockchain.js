@@ -205,8 +205,6 @@ class Blockchain {
     }
   }
 
-  // async
-
   async checkSyncNodeHeaders(headers) {
     let prevHash = "";
 
@@ -277,6 +275,7 @@ class Blockchain {
       console.error(error);
     }
 
+    console.log("lastHeight", lastHeight);
     let newBlock = this.createBlock(txs, this.LastHash, lastHeight + 1);
 
     this.LastHash = newBlock.Hash;
@@ -326,10 +325,6 @@ class Blockchain {
     if (currentHash) {
       while (true) {
         let block = this.deserialize(await this.DB.get(currentHash));
-
-        if (height && block.Header.Height == height) {
-          break;
-        }
 
         block.Transactions.map((tx) => {
           for (let i = 0; i < tx.TxOutputs.length; i++) {
@@ -384,15 +379,14 @@ class Blockchain {
 
         currentHash = block.Header.PrevHash;
 
-        if (block.Header.PrevHash == "") {
+        if (
+          block.Header.PrevHash == "" ||
+          (height && block.Header.Height == height)
+        ) {
           break;
         }
       }
     }
-
-    console.log("UTXOs", UTXOs);
-
-    console.log("spentTXOs", spentTXOs);
 
     return returnSpend ? { UTXOs, spentTXOs } : UTXOs;
   }
