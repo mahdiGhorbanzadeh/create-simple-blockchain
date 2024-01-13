@@ -1,7 +1,7 @@
 const { sha256 } = require("js-sha256");
 
 class Proof {
-  difficulty = 6;
+  difficulty = 5;
 
   constructor(block) {
     this.block = block;

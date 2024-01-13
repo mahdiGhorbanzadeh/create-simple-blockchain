@@ -52,11 +52,9 @@ class CommandLine {
   async printChain(address, nodeID) {
     const chain = new Blockchain(address, nodeID);
 
-    await chain.continueBlockchain(address);
+    await chain.continueBlockchain(true);
 
     await chain.iterate();
-
-    await chain.closeDB();
   }
 
   async createBlockChain(address, nodeID) {
@@ -108,19 +106,7 @@ class CommandLine {
 
     await chain.closeDB();
 
-    if (mineNow) {
-      const cbTx = coinbaseTx(from, "");
-
-      const txs = [cbTx, tx];
-
-      const block = await chain.mineBlock(txs);
-
-      await utxo.update(block);
-    } else {
-      sendTx(KnownNodes[0], tx);
-
-      console.log("send tx");
-    }
+    sendTx(KnownNodes[0], tx);
 
     console.log("Success!");
   }

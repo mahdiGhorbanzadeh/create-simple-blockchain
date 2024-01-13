@@ -20,6 +20,7 @@ let memoryPool = {};
 let reorganizationmode = false;
 let intervalId;
 let isRunning = false;
+let chain;
 
 class Addr {
   constructor(addrList = []) {
@@ -78,18 +79,6 @@ function bytesToCmd(bytes) {
   return cmd;
 }
 
-function extractCmd(request) {
-  const commandLength = 12; // Define your command length here
-
-  return request.slice(0, commandLength);
-}
-
-function requestBlocks() {
-  KnownNodes.forEach((node) => {
-    sendGetBlocks(node);
-  });
-}
-
 function sendBlock(addr, block) {
   const data = new Block(nodeAddress, block);
   const payload = JSON.stringify(data);
@@ -97,10 +86,6 @@ function sendBlock(addr, block) {
 
   sendData(addr, request);
 }
-
-// first try to connect destination node
-// if success send data with dataStream
-// if fail remove node from node list
 
 function sendData(addr, data) {
   const client = new net.Socket();
@@ -215,7 +200,7 @@ function sendTx(addr, tnx) {
   sendData(addr, request);
 }
 
-async function sendVersion(addr, chain) {
+async function sendVersion(addr) {
   console.log(
     `------------------ sendVersion ${addr}-------------------------`
   );
@@ -233,7 +218,7 @@ async function sendVersion(addr, chain) {
   sendData(addr, request);
 }
 
-async function handleBlock(request, chain) {
+async function handleBlock(request) {
   console.log("------------------handleBlock-------------------------");
 
   const commandLength = 12;
@@ -268,7 +253,7 @@ async function handleBlock(request, chain) {
   }
 }
 
-async function handleInv(request, chain) {
+async function handleInv(request) {
   console.log("------------------handleInv-------------------------");
 
   const commandLength = 12;
@@ -348,7 +333,7 @@ async function handleInv(request, chain) {
   }
 }
 
-async function handleGetBlocks(request, chain) {
+async function handleGetBlocks(request) {
   console.log("------------------handleGetBlocks-------------------------");
 
   const commandLength = 12;
@@ -360,7 +345,7 @@ async function handleGetBlocks(request, chain) {
   sendInv(payload.AddrFrom, "block", blocks);
 }
 
-async function handleGetAddress(request, chain) {
+async function handleGetAddress(request) {
   console.log("------------------handleGetAddress-------------------------");
 
   const commandLength = 12;
@@ -372,7 +357,7 @@ async function handleGetAddress(request, chain) {
   console.log(`Sending data to ${payload.AddrFrom}:`, KnownNodes);
 }
 
-async function handleGetHeaders(request, chain) {
+async function handleGetHeaders(request) {
   console.log("------------------handleGetHeaders-------------------------");
 
   const commandLength = 12;
@@ -387,7 +372,7 @@ async function handleGetHeaders(request, chain) {
   sendInv(payload.AddrFrom, "header", headers);
 }
 
-async function handleGetData(request, chain) {
+async function handleGetData(request) {
   console.log("------------------handleGetData-------------------------");
 
   const commandLength = 12;
@@ -412,7 +397,7 @@ async function handleGetData(request, chain) {
   }
 }
 
-async function handleTx(request, chain) {
+async function handleTx(request) {
   console.log("------------------ handleTx -------------------------");
 
   const commandLength = 12;
@@ -434,19 +419,25 @@ async function handleTx(request, chain) {
   console.log("------------------finish handleTx-------------------------");
 }
 
-async function mineTxInterval(chain) {
-  intervalId = setInterval(async () => {
+async function mineTxInterval() {
+  while (true) {
     if (isRunning) {
       console.log(
         "---------------------------- start to mine ------------------------"
       );
-      await mineTx(chain);
+
+      console.log("111111111111111111111111");
+
+      await mineTx();
+
+      console.log("222222222222222222222222");
 
       console.log(
         "---------------------------- end mine ------------------------"
       );
     }
-  }, 2000);
+    await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait for 2 seconds
+  }
 }
 
 function pauseFunction() {
@@ -459,9 +450,7 @@ function resumeFunction() {
   console.log("mine resumed.");
 }
 
-async function mineTx(chain) {
-  console.log("------------------mineTx-------------------------");
-
+async function mineTx() {
   const txs = [];
 
   for (const id in memoryPool) {
@@ -502,7 +491,7 @@ async function mineTx(chain) {
   }
 }
 
-async function handleVersion(request, chain) {
+async function handleVersion(request) {
   console.log("------------------handleVersion-------------------------");
 
   const payload = JSON.parse(request.slice(COMMAND_LENGTH).toString());
@@ -531,7 +520,7 @@ async function handleVersion(request, chain) {
   }
 }
 
-async function handleConnection(data, chain) {
+async function handleConnection(data) {
   console.log("------------------handleConnection-------------------------");
 
   const commandLength = 12;
@@ -540,28 +529,28 @@ async function handleConnection(data, chain) {
 
   switch (command) {
     case "block":
-      await handleBlock(data, chain);
+      await handleBlock(data);
       break;
     case "inv":
-      await handleInv(data, chain);
+      await handleInv(data);
       break;
     case "getheaders":
-      await handleGetHeaders(data, chain);
+      await handleGetHeaders(data);
       break;
     case "getaddress":
-      await handleGetAddress(data, chain);
+      await handleGetAddress(data);
       break;
     case "getblocks":
-      await handleGetBlocks(data, chain);
+      await handleGetBlocks(data);
       break;
     case "getdata":
-      await handleGetData(data, chain);
+      await handleGetData(data);
       break;
     case "tx":
-      await handleTx(data, chain);
+      await handleTx(data);
       break;
     case "version":
-      await handleVersion(data, chain);
+      await handleVersion(data);
       break;
     default:
       console.log("Unknown command");
@@ -574,51 +563,26 @@ const startServer = async (nodeID, minerAddress, address) => {
   nodeAddress = `localhost:${nodeID}`;
   mineAddress = minerAddress;
 
+  chain = new Blockchain(address, nodeID);
+
+  await chain.continueBlockchain(true);
+
   if (nodeAddress != KnownNodes[0]) {
     console.log("----------------run here--------------------------");
-
-    const chain = new Blockchain(address, nodeID);
-
-    await chain.continueBlockchain(address);
 
     await sendGetAddress(KnownNodes[0]);
 
     await sendVersion(KnownNodes[0], chain);
-
-    await chain.closeDB();
   } else {
-    const chain = new Blockchain(address, nodeID);
-
-    await chain.continueBlockchain(address);
-
-    mineTxInterval(chain);
+    mineTxInterval();
     resumeFunction();
   }
 
   const server = net.createServer(async (socket) => {
     console.log("New connection established");
 
-    // if (nodeAddress !== KnownNodes[0]) {
-
-    //   console.log("----------------run here--------------------------")
-
-    //   const chain = new Blockchain(address, nodeID);
-
-    //   await chain.continueBlockchain(address);
-
-    //   await sendVersion(KnownNodes[0], chain);
-
-    //   await chain.closeDB();
-    // }
-
     socket.on("data", async (data) => {
-      let chain = new Blockchain(address, nodeID);
-
-      await chain.continueBlockchain(address);
-
-      await handleConnection(data, chain);
-
-      await chain.closeDB();
+      await handleConnection(data);
     });
 
     socket.on("error", (err) => {
@@ -630,7 +594,8 @@ const startServer = async (nodeID, minerAddress, address) => {
     });
   });
 
-  server.on("error", (err) => {
+  server.on("error", async (err) => {
+    await chain.closeDB();
     console.error("Server error:", err);
   });
 

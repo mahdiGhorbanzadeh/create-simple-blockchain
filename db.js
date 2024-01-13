@@ -1,55 +1,55 @@
-const { Level } = require('level')
+const { Level } = require("level");
 
-let PATH = require('path');
+let PATH = require("path");
 
-require('dotenv').config()
+require("dotenv").config();
 
 let isOpenDB = false;
 
+const createDB = async (path, needToWrite) => {
+  console.log("needToWrite", needToWrite);
+  let DB;
+  let dbPath = PATH.join(process.env.DB_PATH, `db/db-${path}`);
 
-const createDB = async (path) => {
+  if (needToWrite) {
+    while (isOpenDB) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
 
-
-   while(isOpenDB){
-      await new Promise(resolve => setTimeout(resolve, 100));
-   }
-
-   let DB;
-
-   await new Promise((resolve, reject) => {
-      let dbPath = PATH.join(process.env.DB_PATH, `db/db-${path}`);
-      
+    await new Promise((resolve, reject) => {
       isOpenDB = true;
 
       DB = new Level(dbPath);
-  
+
       DB.open((err) => {
         if (err) {
-         resolve(err); 
+          console.log("errerrerrerrerrerrerrerrerrerr", err);
+          resolve(err);
         } else {
           resolve(DB);
         }
       });
-   });
-   
-   console.log("Database open successfully");
+    });
+  } else {
+    DB = new Level(dbPath);
+  }
 
-   return DB;
-}
+  console.log("Database open successfully");
 
-const closeDBRes = ()=>{
-   isOpenDB = false;
-}
+  return DB;
+};
 
-const returnPath = (path)=>{
-   return PATH.join(process.env.DB_PATH, `db/db-${path}`);
-}
+const closeDBRes = () => {
+  isOpenDB = false;
+};
+
+const returnPath = (path) => {
+  return PATH.join(process.env.DB_PATH, `db/db-${path}`);
+};
 
 module.exports = {
-   createDB,
-   returnPath,
-   closeDBRes,
-   LH_KEY:"lh"
-}
-
-
+  createDB,
+  returnPath,
+  closeDBRes,
+  LH_KEY: "lh",
+};

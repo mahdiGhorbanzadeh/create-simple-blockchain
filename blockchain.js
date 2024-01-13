@@ -17,9 +17,9 @@ class Blockchain {
     this.Miner = address;
   }
 
-  async initBlockchain(address) {
+  async initBlockchain(address, needToWrite) {
     try {
-      await this.openDB();
+      await this.openDB(needToWrite);
 
       let res = await this.DB.get(LH_KEY);
 
@@ -40,13 +40,15 @@ class Blockchain {
     }
   }
 
-  async continueBlockchain() {
-    await this.openDB();
+  async continueBlockchain(needToWrite) {
+    await this.openDB(needToWrite);
 
     try {
       let res = await this.DB.get(LH_KEY);
       this.LastHash = res;
     } catch (e) {
+      console.log("eeeeeeeeeeeeeeeeeee", e);
+
       if (e.code == "LEVEL_NOT_FOUND") {
         this.LastHash = "";
       }
@@ -272,21 +274,16 @@ class Blockchain {
       const lastBlock = this.deserialize(lastBlockData);
       lastHeight = lastBlock.Header.Height;
     } catch (error) {
-      console.error(error);
+      console.error("error", error);
     }
 
-    console.log("lastHeight", lastHeight);
     let newBlock = this.createBlock(txs, this.LastHash, lastHeight + 1);
 
     this.LastHash = newBlock.Hash;
 
-    console.log("newBlock.Hash", newBlock.Hash);
+    await this.DB.put(LH_KEY, newBlock.Hash);
 
-    console.log("------------------------newBlock", newBlock);
-
-    this.DB.put(LH_KEY, newBlock.Hash);
-
-    this.DB.put(newBlock.Hash, this.serialize(newBlock));
+    await this.DB.put(newBlock.Hash, this.serialize(newBlock));
 
     return newBlock;
   }
@@ -316,7 +313,7 @@ class Blockchain {
   }
 
   async findUTXODB(returnSpend = false, height) {
-    let currentHash = this.LastHash;
+    let currentHash = await this.DB.get("lh").catch(() => "");
 
     let UTXOs = {};
 
@@ -331,8 +328,6 @@ class Blockchain {
             let fail = false;
 
             if (spentTXOs[tx.ID]) {
-              let spendOuts = spentTXOs[tx.ID];
-
               for (let j = 0; j < spentTXOs[tx.ID].length; j++) {
                 if (spentTXOs[tx.ID][j] == i) {
                   const index = spentTXOs[tx.ID].indexOf(spentTXOs[tx.ID][j]);
@@ -538,6 +533,8 @@ class Blockchain {
   async iterate() {
     let currentHash = this.LastHash;
 
+    console.log("currentHash", currentHash);
+
     while (true) {
       let block = this.deserialize(await this.DB.get(currentHash));
 
@@ -573,8 +570,8 @@ class Blockchain {
     return blocks;
   }
 
-  async openDB() {
-    this.DB = await createDB(this.Node);
+  async openDB(needToWrite) {
+    this.DB = await createDB(this.Node, needToWrite);
   }
 
   async closeDB() {
