@@ -271,30 +271,9 @@ async function handleInv(request) {
   );
 
   if (payload.Type === "header") {
-    // reorganizationHeaders = reorganizationHeaders.concat(payload.Items);
-    // if (payload.Items.length == 100) {
-    //   sendGetHeaders(
-    //     payload.AddrFrom,
-    //     payload.Items[payload.Items.length - 1].Hash,
-    //     ""
-    //   );
-    // } else {
-    //   await chain.checkSyncNodeHeaders(reorganizationHeaders);
-    //   let height = await chain.findCommonPointWithSyncNode(
-    //     reorganizationHeaders
-    //   );
-    //   console.log(" findCommonPointWithSyncNode height ", height);
-    //   reorganizationHeaders = reorganizationHeaders.slice(height - 1);
-    //   blocksInTransit = await chain.getHeadersHashFromHeaders(
-    //     reorganizationHeaders
-    //   );
-    //   console.log(
-    //     "blocksInTransit blocksInTransit blocksInTransit blocksInTransit",
-    //     blocksInTransit.slice(0, 16)
-    //   );
-    //   sendGetData(payload.AddrFrom, "block", blocksInTransit.slice(0, 16));
-    //   reorganizationHeaders = [];
-    // }
+    if (reorganizationHeaders.length == 0) {
+      sendGetData(payload.AddrFrom, "block", payload.Items[0]);
+    }
   }
 
   if (payload.Type === "addr") {
@@ -520,7 +499,7 @@ async function mineTx() {
 
   for (const node of KnownNodes) {
     if (node !== nodeAddress) {
-      sendInv(node, "block", [newBlock.Hash]);
+      sendInv(node, "header", [newBlock.Header]);
     }
   }
 }
