@@ -28,7 +28,7 @@ class Addr {
   }
 }
 class Block {
-  constructor(addrFrom = "", block = Buffer.alloc(0)) {
+  constructor(addrFrom = "", block) {
     this.AddrFrom = addrFrom;
     this.Block = block;
   }
@@ -81,7 +81,10 @@ function bytesToCmd(bytes) {
 
 function sendBlock(addr, block) {
   const data = new Block(nodeAddress, block);
+
   const payload = JSON.stringify(data);
+
+  console.log("payload for send block to user", payload);
   const request = Buffer.concat([cmdToBytes("block"), Buffer.from(payload)]);
 
   sendData(addr, request);
@@ -96,6 +99,8 @@ function sendData(addr, data) {
     KnownNodes = updatedNodes;
     client.destroy();
   });
+
+  console.log("addr", addr);
 
   client.connect({ port: addr.split("localhost:")[1] }, () => {
     const dataStream = new Readable();
@@ -231,7 +236,7 @@ async function handleBlock(request) {
 
   const blocks = blockData;
 
-  console.log("Received a new block list! ");
+  console.log("Received a new block list! ", blocks);
 
   let res = await chain.addBlock(blocks);
 
@@ -239,11 +244,12 @@ async function handleBlock(request) {
     reorganizationmode = true;
     blocksInTransit = [];
     sendVersion(payload.addrFrom, chain);
+    return;
   } else {
     blocksInTransit = blocksInTransit.slice(16);
   }
 
-  console.log(`Added block ${block.Hash}`);
+  console.log(`Added block ${blocks}`);
 
   if (blocksInTransit.length > 0) {
     sendGetData(payload.AddrFrom, "block", blocksInTransit.slice(0, 16));
@@ -265,34 +271,30 @@ async function handleInv(request) {
   );
 
   if (payload.Type === "header") {
-    reorganizationHeaders = reorganizationHeaders.concat(payload.Items);
-    if (payload.Items.length == 100) {
-      sendGetHeaders(
-        payload.AddrFrom,
-        payload.Items[payload.Items.length - 1].Hash,
-        ""
-      );
-    } else {
-      await chain.checkSyncNodeHeaders(reorganizationHeaders);
-
-      let height = await chain.findCommonPointWithSyncNode(
-        reorganizationHeaders
-      );
-
-      reorganizationHeaders = reorganizationHeaders.slice(height - 1);
-
-      blocksInTransit = await chain.getHeadersHashFromHeaders(
-        reorganizationHeaders
-      );
-
-      const utxo = new UTXOSet(chain);
-
-      await utxo.reIndex();
-
-      sendGetData(payload.AddrFrom, "block", blocksInTransit.slice(0, 16));
-
-      reorganizationHeaders = [];
-    }
+    // reorganizationHeaders = reorganizationHeaders.concat(payload.Items);
+    // if (payload.Items.length == 100) {
+    //   sendGetHeaders(
+    //     payload.AddrFrom,
+    //     payload.Items[payload.Items.length - 1].Hash,
+    //     ""
+    //   );
+    // } else {
+    //   await chain.checkSyncNodeHeaders(reorganizationHeaders);
+    //   let height = await chain.findCommonPointWithSyncNode(
+    //     reorganizationHeaders
+    //   );
+    //   console.log(" findCommonPointWithSyncNode height ", height);
+    //   reorganizationHeaders = reorganizationHeaders.slice(height - 1);
+    //   blocksInTransit = await chain.getHeadersHashFromHeaders(
+    //     reorganizationHeaders
+    //   );
+    //   console.log(
+    //     "blocksInTransit blocksInTransit blocksInTransit blocksInTransit",
+    //     blocksInTransit.slice(0, 16)
+    //   );
+    //   sendGetData(payload.AddrFrom, "block", blocksInTransit.slice(0, 16));
+    //   reorganizationHeaders = [];
+    // }
   }
 
   if (payload.Type === "addr") {
@@ -364,12 +366,16 @@ async function handleGetHeaders(request) {
 
   const payload = JSON.parse(request.slice(commandLength).toString());
 
+  console.log("payload handleGetHeaders ", payload);
+
   const headers = await chain.getBlockHeaders(
     payload.FromHeaderHash,
     payload.StopHeaderHash
   );
 
-  sendInv(payload.AddrFrom, "header", headers);
+  console.log("headers must be sent", headers, payload.AddrFrom);
+
+  sendGetData(payload.AddrFrom, "header", headers);
 }
 
 async function handleGetData(request) {
@@ -379,7 +385,39 @@ async function handleGetData(request) {
 
   const payload = JSON.parse(request.slice(commandLength).toString());
 
-  if (payload.kind === "block") {
+  if (payload.kind === "header") {
+    reorganizationHeaders = reorganizationHeaders.concat(payload.id);
+    if (payload.id.length == 100) {
+      sendGetHeaders(
+        payload.nodeAddress,
+        payload.id[payload.id.length - 1].Hash,
+        ""
+      );
+    } else {
+      await chain.checkSyncNodeHeaders(reorganizationHeaders);
+
+      let height = await chain.findCommonPointWithSyncNode(
+        reorganizationHeaders
+      );
+
+      console.log(" findCommonPointWithSyncNode height ", height);
+
+      reorganizationHeaders = reorganizationHeaders.slice(height - 1);
+
+      blocksInTransit = await chain.getHeadersHashFromHeaders(
+        reorganizationHeaders
+      );
+
+      console.log(
+        "blocksInTransit blocksInTransit blocksInTransit blocksInTransit",
+        blocksInTransit.slice(0, 16)
+      );
+
+      sendGetData(payload.nodeAddress, "block", blocksInTransit.slice(0, 16));
+
+      reorganizationHeaders = [];
+    }
+  } else if (payload.kind === "block") {
     console.log("getBlock headerHash", payload.id);
 
     let blocks = await chain.getBlock(payload.id);
@@ -426,11 +464,7 @@ async function mineTxInterval() {
         "---------------------------- start to mine ------------------------"
       );
 
-      console.log("111111111111111111111111");
-
       await mineTx();
-
-      console.log("222222222222222222222222");
 
       console.log(
         "---------------------------- end mine ------------------------"
@@ -507,7 +541,7 @@ async function handleVersion(request) {
   if (bestHeight < otherHeight) {
     await sendGetHeaders(
       payload.AddrFrom,
-      await chain.getBlockWithHeight(0),
+      await chain.getBlockWithHeight(1),
       ""
     );
   } else if (bestHeight > otherHeight) {
@@ -574,8 +608,8 @@ const startServer = async (nodeID, minerAddress, address) => {
 
     await sendVersion(KnownNodes[0], chain);
   } else {
-    mineTxInterval();
-    resumeFunction();
+    // mineTxInterval();
+    // resumeFunction();
   }
 
   const server = net.createServer(async (socket) => {

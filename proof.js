@@ -11,12 +11,8 @@ class Proof {
     return "".padStart(this.difficulty, "0");
   }
 
-  initData(nonce) {
-    return (
-      this.block.hashTransactions() +
-      this.toHex(nonce) +
-      this.toHex(this.difficulty)
-    );
+  initData() {
+    return this.block.hashTransactions() + this.toHex(this.difficulty);
   }
 
   run() {
@@ -24,7 +20,10 @@ class Proof {
     let hash = "";
 
     while (true) {
-      let data = this.initData(nonce);
+      this.block.Header.Nonce = nonce;
+
+      let data = this.initData();
+
       hash = sha256(data);
 
       if (hash.startsWith(this.returnDifficulty(), 0)) {
@@ -38,14 +37,14 @@ class Proof {
   }
 
   validate() {
-    let data = this.initData(this.block.Header.Nonce);
+    let data = this.initData();
     let hash = sha256(data);
 
     return hash === this.block.Hash;
   }
 
   validateProof() {
-    if (this.block.Header.Hash.startsWith(this.returnDifficulty(), 0)) {
+    if (this.block.Hash.startsWith(this.returnDifficulty(), 0)) {
       return true;
     } else {
       return false;

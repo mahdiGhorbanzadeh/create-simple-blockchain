@@ -32,7 +32,7 @@ class Blockchain {
         console.log("block.LH_KEY ", LH_KEY);
 
         await this.DB.put(block.Hash, this.serialize(block));
-        await this.DB.put(block.Header.Height, block.Hash);
+        await this.DB.put(`block_${block.Header.Height}`, block.Hash);
         await this.DB.put(LH_KEY, block.Hash);
 
         this.LastHash = block.Hash;
@@ -78,14 +78,14 @@ class Blockchain {
         const block = blocks[i];
 
         const blockExists = await this.DB.get(block.Header.Hash).catch(
-          () => null
+          () => ""
         );
 
         if (blockExists) {
           return;
         }
 
-        const blockData = this.serialize(block);
+        const blockData = block;
 
         let lastHash = await this.DB.get("lh").catch(() => "");
 
@@ -93,12 +93,17 @@ class Blockchain {
 
         const lastBlock = lastBlockData ? this.deserialize(lastBlockData) : "";
 
+        console.log("blockData", blockData);
+
         if (
           (!lastBlock && blockData.Header.Height == 1) ||
           blockData.Header.Height == lastBlock.Header.Height + 1
         ) {
-          await txn.put("lh", blockData.Header.Hash);
-          this.LastHash = blockData.Header.Hash;
+          await txn.put("lh", blockData.Hash);
+          await txn.put(`block_${blockData.Header.Height}`, blockData.Hash);
+          await txn.put(blockData.Hash, this.serialize(blockData));
+
+          this.LastHash = blockData.Hash;
         } else {
           return "fork";
         }
@@ -163,16 +168,34 @@ class Blockchain {
       } catch (e) {}
     }
 
-    while (nowHash == stopHeaderHash || count == number) {
+    try {
+      let lastHash = await this.DB.get("lh");
+
+      const lastBlockData = this.deserialize(await this.DB.get(lastHash));
+
+      number = lastBlockData.Header.Height;
+    } catch (e) {
+      console.log("e", e);
+    }
+
+    console.log("number", number);
+
+    while (true) {
+      if ((stopHeaderHash && nowHash == stopHeaderHash) || count == number) {
+        break;
+      }
+
       try {
         let hash = await this.DB.get(`block_${height}`);
+
         let block = this.deserialize(await this.DB.get(hash));
 
         count += 1;
         height += 1;
+
         nowHash = block.Header.Hash;
 
-        headers.push(block.Header);
+        headers.push({ Hash: block.Hash, Header: block.Header });
       } catch {}
     }
 
@@ -180,16 +203,16 @@ class Blockchain {
   }
 
   async getBlockWithHeight(height) {
-    return await this.DB.get(`block_${height}`).catch(() => null);
+    return await this.DB.get(`block_${height}`).catch(() => "");
   }
 
   async findCommonPointWithSyncNode(headers) {
     let height = 1;
 
     for (let i = 0; i < headers.length; i++) {
-      let hash = await this.DB.get(`block_${height}`);
+      let hash = await this.DB.get(`block_${height}`).catch(() => "");
 
-      if (hash != header[i].hash) {
+      if (hash != headers[i].Hash) {
         return height;
       }
 
@@ -205,43 +228,52 @@ class Blockchain {
     for (let i = 0; i < headers.length; i++) {
       headerHashs.push(headers[i].Hash);
     }
+
+    return headerHashs;
   }
 
   async checkSyncNodeHeaders(headers) {
-    let prevHash = "";
+    let hash = "";
 
     for (let i = 0; i < headers.length; i++) {
       let block = new Block(
-        headers[i].Timestamp,
+        headers[i].Header.Timestamp,
         headers[i].Hash,
         [],
-        headers[i].PrevHash,
-        headers[i].Nonce,
-        headers[i].Height
+        headers[i].Header.PrevHash,
+        headers[i].Header.Nonce,
+        headers[i].Header.Height,
+        headers[i].Header.MerkleRoot
       );
 
       let proof = new Proof(block);
 
       if (
-        header.PrevHash != prevHash ||
+        (hash && headers[i].Header.PrevHash != hash) ||
         !proof.validateProof() ||
         !proof.validate()
       ) {
         throw new Error("Error checking sync node headers");
       }
 
-      prevHash = block.Header.PrevHash;
+      hash = block.Hash;
     }
   }
 
   async getBlock(headerHashes) {
     let blocks = [];
 
+    console.log("start get block----------", headerHashes, headerHashes.length);
+
     for (let i = 0; i < headerHashes.length; i++) {
       try {
         const blockData = await this.DB.get(headerHashes[i]);
 
+        console.log("blockData", blockData);
+
         const block = this.deserialize(blockData);
+
+        console.log("block", block);
 
         blocks.push(block);
       } catch (error) {
@@ -284,6 +316,8 @@ class Blockchain {
     await this.DB.put(LH_KEY, newBlock.Hash);
 
     await this.DB.put(newBlock.Hash, this.serialize(newBlock));
+
+    await this.DB.put(`block_${newBlock.Header.Height}`, newBlock.Hash);
 
     return newBlock;
   }
@@ -483,8 +517,6 @@ class Blockchain {
   }
 
   async verifyTransaction(tx) {
-    console.log("tx", tx);
-
     if (isCoinBaseTx(tx)) {
       return true;
     }
