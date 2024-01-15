@@ -84,7 +84,6 @@ function sendBlock(addr, block) {
 
   const payload = JSON.stringify(data);
 
-  console.log("payload for send block to user", payload);
   const request = Buffer.concat([cmdToBytes("block"), Buffer.from(payload)]);
 
   sendData(addr, request);
@@ -241,9 +240,10 @@ async function handleBlock(request) {
   let res = await chain.addBlock(blocks);
 
   if (res == "fork") {
+    console.log("-----------------------------forked");
     reorganizationmode = true;
     blocksInTransit = [];
-    sendVersion(payload.addrFrom, chain);
+    await sendVersion(payload.AddrFrom, chain);
     return;
   } else {
     blocksInTransit = blocksInTransit.slice(16);
@@ -271,8 +271,14 @@ async function handleInv(request) {
   );
 
   if (payload.Type === "header") {
+    console.log(
+      " handle inv reorganizationHeaders",
+      reorganizationHeaders,
+      payload
+    );
+
     if (reorganizationHeaders.length == 0) {
-      sendGetData(payload.AddrFrom, "block", payload.Items[0]);
+      sendGetData(payload.AddrFrom, "block", [payload.Items[0].Hash]);
     }
   }
 
@@ -366,6 +372,7 @@ async function handleGetData(request) {
 
   if (payload.kind === "header") {
     reorganizationHeaders = reorganizationHeaders.concat(payload.id);
+    console.log("payload.id.length", payload.id.length);
     if (payload.id.length == 100) {
       sendGetHeaders(
         payload.nodeAddress,
@@ -373,6 +380,7 @@ async function handleGetData(request) {
         ""
       );
     } else {
+      console.log("finish send header");
       await chain.checkSyncNodeHeaders(reorganizationHeaders);
 
       let height = await chain.findCommonPointWithSyncNode(
@@ -499,7 +507,9 @@ async function mineTx() {
 
   for (const node of KnownNodes) {
     if (node !== nodeAddress) {
-      sendInv(node, "header", [newBlock.Header]);
+      sendInv(node, "header", [
+        { Hash: newBlock.Hash, Header: newBlock.Header },
+      ]);
     }
   }
 }

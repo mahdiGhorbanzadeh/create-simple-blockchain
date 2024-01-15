@@ -173,11 +173,15 @@ class Blockchain {
 
       const lastBlockData = this.deserialize(await this.DB.get(lastHash));
 
-      number = lastBlockData.Header.Height;
+      number =
+        lastBlockData.Header.Height - height < 100
+          ? lastBlockData.Header.Height - height
+          : 100;
     } catch (e) {
       console.log("e", e);
     }
 
+    console.log("fromHeaderHash", fromHeaderHash);
     console.log("number", number);
 
     while (true) {
@@ -247,6 +251,15 @@ class Blockchain {
       );
 
       let proof = new Proof(block);
+
+      console.log(
+        "hash && headers[i].Header.PrevHash != hash",
+        hash && headers[i].Header.PrevHash != hash
+      );
+
+      console.log("proof.validateProof()", proof.validateProof());
+
+      console.log("proof.validate()", proof.validate());
 
       if (
         (hash && headers[i].Header.PrevHash != hash) ||
