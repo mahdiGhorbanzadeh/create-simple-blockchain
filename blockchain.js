@@ -93,6 +93,7 @@ class Blockchain {
 
         const lastBlock = lastBlockData ? this.deserialize(lastBlockData) : "";
 
+        console.log("lastBlock", lastBlock);
         console.log("blockData", blockData);
 
         if (
@@ -164,7 +165,7 @@ class Blockchain {
     if (fromHeaderHash) {
       try {
         let block = this.deserialize(await this.DB.get(fromHeaderHash));
-        height = block.Header.Height;
+        height = block.Header.Height + 1;
       } catch (e) {}
     }
 
@@ -239,6 +240,8 @@ class Blockchain {
   async checkSyncNodeHeaders(headers) {
     let hash = "";
 
+    console.log("headers", headers);
+
     for (let i = 0; i < headers.length; i++) {
       let block = new Block(
         headers[i].Header.Timestamp,
@@ -252,14 +255,13 @@ class Blockchain {
 
       let proof = new Proof(block);
 
-      console.log(
-        "hash && headers[i].Header.PrevHash != hash",
-        hash && headers[i].Header.PrevHash != hash
-      );
-
-      console.log("proof.validateProof()", proof.validateProof());
-
-      console.log("proof.validate()", proof.validate());
+      // console.log(
+      //   "hash && headers[i].Header.PrevHash != hash",
+      //   headers[i],
+      //   hash,
+      //   headers[i].Header.PrevHash,
+      //   hash && headers[i].Header.PrevHash != hash
+      // );
 
       if (
         (hash && headers[i].Header.PrevHash != hash) ||
@@ -276,17 +278,11 @@ class Blockchain {
   async getBlock(headerHashes) {
     let blocks = [];
 
-    console.log("start get block----------", headerHashes, headerHashes.length);
-
     for (let i = 0; i < headerHashes.length; i++) {
       try {
         const blockData = await this.DB.get(headerHashes[i]);
 
-        console.log("blockData", blockData);
-
         const block = this.deserialize(blockData);
-
-        console.log("block", block);
 
         blocks.push(block);
       } catch (error) {

@@ -17,7 +17,6 @@ let KnownNodes = ["localhost:3000"];
 let blocksInTransit = [];
 let reorganizationHeaders = [];
 let memoryPool = {};
-let reorganizationmode = false;
 let intervalId;
 let isRunning = false;
 let chain;
@@ -229,19 +228,17 @@ async function handleBlock(request) {
 
   const payload = JSON.parse(request.slice(commandLength).toString());
 
-  console.log("payload", payload);
-
   const blockData = payload.Block;
 
   const blocks = blockData;
 
-  console.log("Received a new block list! ", blocks);
+  // console.log("Received a new block list! ", blocks);
 
   let res = await chain.addBlock(blocks);
 
   if (res == "fork") {
     console.log("-----------------------------forked");
-    reorganizationmode = true;
+    pauseFunction();
     blocksInTransit = [];
     await sendVersion(payload.AddrFrom, chain);
     return;
@@ -371,8 +368,23 @@ async function handleGetData(request) {
   const payload = JSON.parse(request.slice(commandLength).toString());
 
   if (payload.kind === "header") {
-    reorganizationHeaders = reorganizationHeaders.concat(payload.id);
-    console.log("payload.id.length", payload.id.length);
+    //----------------------->
+    let tempReorganizationHeaders = reorganizationHeaders;
+
+    for (let i = 0; i < payload.id.length; i++) {
+      let use = false;
+      for (let j = 0; j < tempReorganizationHeaders.length; j++) {
+        if (payload.id[i].Hash == tempReorganizationHeaders[j].Hash) {
+          use = true;
+          break;
+        }
+      }
+
+      if (!use) {
+        reorganizationHeaders.push(payload.id[i]);
+      }
+    }
+
     if (payload.id.length == 100) {
       sendGetHeaders(
         payload.nodeAddress,
@@ -397,7 +409,7 @@ async function handleGetData(request) {
 
       console.log(
         "blocksInTransit blocksInTransit blocksInTransit blocksInTransit",
-        blocksInTransit.slice(0, 16)
+        blocksInTransit
       );
 
       sendGetData(payload.nodeAddress, "block", blocksInTransit.slice(0, 16));
@@ -528,11 +540,8 @@ async function handleVersion(request) {
   console.log("otherHeight", payload, otherHeight);
 
   if (bestHeight < otherHeight) {
-    await sendGetHeaders(
-      payload.AddrFrom,
-      await chain.getBlockWithHeight(1),
-      ""
-    );
+    pauseFunction();
+    await sendGetHeaders(payload.AddrFrom, "", "");
   } else if (bestHeight > otherHeight) {
     await sendVersion(payload.AddrFrom, chain);
   }
@@ -596,9 +605,6 @@ const startServer = async (nodeID, minerAddress, address) => {
     await sendGetAddress(KnownNodes[0]);
 
     await sendVersion(KnownNodes[0], chain);
-  } else {
-    // mineTxInterval();
-    // resumeFunction();
   }
 
   const server = net.createServer(async (socket) => {
