@@ -17,7 +17,7 @@ let KnownNodes = ["localhost:3000"];
 let blocksInTransit = [];
 let reorganizationHeaders = [];
 let memoryPool = {};
-let intervalId;
+let reorganizationMode = false;
 let isRunning = false;
 let chain;
 
@@ -238,9 +238,11 @@ async function handleBlock(request) {
 
   if (res == "fork") {
     console.log("-----------------------------forked");
-    pauseFunction();
+    if (mineAddress) {
+      pauseFunction();
+    }
     blocksInTransit = [];
-    await sendVersion(payload.AddrFrom, chain);
+    if (!reorganizationMode) await sendVersion(payload.AddrFrom, chain);
     return;
   } else {
     blocksInTransit = blocksInTransit.slice(16);
@@ -251,6 +253,10 @@ async function handleBlock(request) {
   if (blocksInTransit.length > 0) {
     sendGetData(payload.AddrFrom, "block", blocksInTransit.slice(0, 16));
   } else {
+    if (mineAddress) {
+      resumeFunction();
+    }
+    reorganizationMode = false;
     const utxo = new UTXOSet(chain);
     await utxo.reIndex();
   }
@@ -268,12 +274,6 @@ async function handleInv(request) {
   );
 
   if (payload.Type === "header") {
-    console.log(
-      " handle inv reorganizationHeaders",
-      reorganizationHeaders,
-      payload
-    );
-
     if (reorganizationHeaders.length == 0) {
       sendGetData(payload.AddrFrom, "block", [payload.Items[0].Hash]);
     }
@@ -503,6 +503,20 @@ async function mineTx() {
 
   const newBlock = await chain.mineBlock(txs);
 
+  if (newBlock == "fork") {
+    console.log("-----------------------------forked");
+    if (mineAddress) {
+      pauseFunction();
+    }
+    blocksInTransit = [];
+
+    if (!reorganizationMode) {
+      await sendVersion(KnownNodes[0], chain);
+    }
+  } else if (!newBlock) {
+    return;
+  }
+
   console.log("newBlock genrated");
 
   const utxo = new UTXOSet(chain);
@@ -540,8 +554,13 @@ async function handleVersion(request) {
   console.log("otherHeight", payload, otherHeight);
 
   if (bestHeight < otherHeight) {
-    pauseFunction();
-    await sendGetHeaders(payload.AddrFrom, "", "");
+    if (!reorganizationMode) {
+      if (mineAddress) {
+        pauseFunction();
+      }
+      reorganizationMode = true;
+      await sendGetHeaders(payload.AddrFrom, "", "");
+    }
   } else if (bestHeight > otherHeight) {
     await sendVersion(payload.AddrFrom, chain);
   }
@@ -631,6 +650,13 @@ const startServer = async (nodeID, minerAddress, address) => {
   server.listen(nodeID, "localhost", () => {
     console.log(`Server running on localhost:${nodeID}`);
   });
+
+  console.log("mineAddress", mineAddress);
+
+  if (mineAddress) {
+    mineTxInterval();
+    resumeFunction();
+  }
 };
 
 function GobEncode(data) {

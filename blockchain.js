@@ -255,14 +255,6 @@ class Blockchain {
 
       let proof = new Proof(block);
 
-      // console.log(
-      //   "hash && headers[i].Header.PrevHash != hash",
-      //   headers[i],
-      //   hash,
-      //   headers[i].Header.PrevHash,
-      //   hash && headers[i].Header.PrevHash != hash
-      // );
-
       if (
         (hash && headers[i].Header.PrevHash != hash) ||
         !proof.validateProof() ||
@@ -320,15 +312,32 @@ class Blockchain {
 
     let newBlock = this.createBlock(txs, this.LastHash, lastHeight + 1);
 
-    this.LastHash = newBlock.Hash;
+    let newlastHeight = 0;
+    let newlastHash;
+    try {
+      newlastHash = await this.DB.get("lh");
+      const newlastBlockData = await this.DB.get(newlastHash);
+      const newlastBlock = this.deserialize(newlastBlockData);
+      newlastHeight = newlastBlock.Header.Height;
+    } catch (error) {
+      console.error("error", error);
+    }
 
-    await this.DB.put(LH_KEY, newBlock.Hash);
+    if (newlastHeight == lastHeight) {
+      this.LastHash = newBlock.Hash;
 
-    await this.DB.put(newBlock.Hash, this.serialize(newBlock));
+      await this.DB.put(LH_KEY, newBlock.Hash);
 
-    await this.DB.put(`block_${newBlock.Header.Height}`, newBlock.Hash);
+      await this.DB.put(newBlock.Hash, this.serialize(newBlock));
 
-    return newBlock;
+      await this.DB.put(`block_${newBlock.Header.Height}`, newBlock.Hash);
+
+      return newBlock;
+    } else {
+      if (Math.abs(newlastHeight - lastHeight) > 1) {
+        return "fork";
+      }
+    }
   }
 
   serialize(block) {
