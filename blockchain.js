@@ -98,7 +98,7 @@ class Blockchain {
 
         if (
           (!lastBlock && blockData.Header.Height == 1) ||
-          blockData.Header.Height == lastBlock.Header.Height + 1
+          (lastBlock && blockData.Header.Height == lastBlock.Header.Height + 1)
         ) {
           await txn.put("lh", blockData.Hash);
           await txn.put(`block_${blockData.Header.Height}`, blockData.Hash);
@@ -235,6 +235,32 @@ class Blockchain {
     }
 
     return headerHashs;
+  }
+
+  async backwardChain(height) {
+    try {
+      while (true) {
+        let lastHash = await this.DB.get("lh");
+
+        if (lastHash == "") {
+          break;
+        }
+
+        const lastBlockData = await this.DB.get(lastHash);
+        const lastBlock = this.deserialize(lastBlockData);
+        let lastHeight = lastBlock.Header.Height;
+
+        if (lastHeight < height) {
+          break;
+        }
+
+        await this.DB.put("lh", lastBlock.Header.PrevHash);
+        await this.DB.put(lastHash, "");
+        await this.DB.put(`block_${lastHeight}`, "");
+      }
+    } catch (error) {
+      console.error("error occure in backwardChain function", error);
+    }
   }
 
   async checkSyncNodeHeaders(headers) {
@@ -585,18 +611,22 @@ class Blockchain {
 
     console.log("currentHash", currentHash);
 
-    while (true) {
-      let block = this.deserialize(await this.DB.get(currentHash));
+    if (currentHash) {
+      while (true) {
+        let block = this.deserialize(await this.DB.get(currentHash));
 
-      console.log(".............................................");
+        console.log(".............................................");
 
-      currentHash = block.Header.PrevHash;
+        currentHash = block.Header.PrevHash;
 
-      console.log(`block ${block.Header.Height}`, block);
+        console.log(`block ${block.Header.Height}`, block);
 
-      if (block.Header.PrevHash == "") {
-        break;
+        if (block.Header.PrevHash == "") {
+          break;
+        }
       }
+    } else {
+      console.log("There is no block in chain");
     }
   }
 

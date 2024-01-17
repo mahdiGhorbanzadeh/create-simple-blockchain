@@ -238,9 +238,7 @@ async function handleBlock(request) {
 
   if (res == "fork") {
     console.log("-----------------------------forked");
-    if (mineAddress) {
-      pauseFunction();
-    }
+
     blocksInTransit = [];
     if (!reorganizationMode) await sendVersion(payload.AddrFrom, chain);
     return;
@@ -274,7 +272,7 @@ async function handleInv(request) {
   );
 
   if (payload.Type === "header") {
-    if (reorganizationHeaders.length == 0) {
+    if (!reorganizationMode) {
       sendGetData(payload.AddrFrom, "block", [payload.Items[0].Hash]);
     }
   }
@@ -403,13 +401,10 @@ async function handleGetData(request) {
 
       reorganizationHeaders = reorganizationHeaders.slice(height - 1);
 
+      await chain.backwardChain(height);
+
       blocksInTransit = await chain.getHeadersHashFromHeaders(
         reorganizationHeaders
-      );
-
-      console.log(
-        "blocksInTransit blocksInTransit blocksInTransit blocksInTransit",
-        blocksInTransit
       );
 
       sendGetData(payload.nodeAddress, "block", blocksInTransit.slice(0, 16));
@@ -475,6 +470,7 @@ async function mineTxInterval() {
 
 function pauseFunction() {
   isRunning = false;
+
   console.log("mine paused.");
 }
 
@@ -505,9 +501,7 @@ async function mineTx() {
 
   if (newBlock == "fork") {
     console.log("-----------------------------forked");
-    if (mineAddress) {
-      pauseFunction();
-    }
+
     blocksInTransit = [];
 
     if (!reorganizationMode) {
