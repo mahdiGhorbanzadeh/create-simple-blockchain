@@ -11,33 +11,11 @@ const {
 } = require("./transaction");
 
 const { sha256 } = require("bitcoinjs-lib/src/crypto");
+const { afterMintBlock } = require("./network");
 class Blockchain {
   constructor(address, node) {
     this.Node = node;
     this.Miner = address;
-  }
-
-  async initBlockchain(address, needToWrite) {
-    try {
-      await this.openDB(needToWrite);
-
-      let res = await this.DB.get(LH_KEY);
-
-      this.LastHash = res;
-    } catch (e) {
-      if (e.code == "LEVEL_NOT_FOUND") {
-        let cbtx = coinbaseTx(address, "");
-        let block = this.createBlock([cbtx], "", 1);
-
-        console.log("block.LH_KEY ", LH_KEY);
-
-        await this.DB.put(block.Hash, this.serialize(block));
-        await this.DB.put(`block_${block.Header.Height}`, block.Hash);
-        await this.DB.put(LH_KEY, block.Hash);
-
-        this.LastHash = block.Hash;
-      }
-    }
   }
 
   async continueBlockchain(needToWrite) {
@@ -53,21 +31,6 @@ class Blockchain {
         this.LastHash = "";
       }
     }
-  }
-
-  createBlock(txs, prevHash, height) {
-    let block = new Block(this.createTimeStamp(), "", txs, prevHash, 0, height);
-    let pow = new Proof(block);
-    let res = pow.run();
-
-    block.Header.Nonce = res.nonce;
-    block.Hash = res.hash;
-
-    return block;
-  }
-
-  createTimeStamp() {
-    return BigInt(new Date().getTime()).toString();
   }
 
   async addBlock(blocks) {
@@ -98,7 +61,9 @@ class Blockchain {
 
         if (
           (!lastBlock && blockData.Header.Height == 1) ||
-          (lastBlock && blockData.Header.Height == lastBlock.Header.Height + 1)
+          (lastBlock &&
+            blockData.Header.Height == lastBlock.Header.Height + 1 &&
+            blockData.Header.PrevHash == lastBlock.Hash)
         ) {
           await txn.put("lh", blockData.Hash);
           await txn.put(`block_${blockData.Header.Height}`, blockData.Hash);
@@ -238,6 +203,10 @@ class Blockchain {
   }
 
   async backwardChain(height) {
+    console.log(
+      "---------------------------backward chain run----------------------------------"
+    );
+
     try {
       while (true) {
         let lastHash = await this.DB.get("lh");
@@ -308,6 +277,8 @@ class Blockchain {
           return null;
         }
 
+        console.log("Error fetching block", headerHashes);
+
         throw new Error("Error fetching block");
       }
     }
@@ -315,28 +286,9 @@ class Blockchain {
     return blocks;
   }
 
-  async mineBlock(txs) {
-    let lastHash;
-    let lastHeight = 0;
-
-    for (let i = 0; i < txs.length; i++) {
-      if ((await this.verifyTransaction(txs[i])) != true) {
-        console.error("Error in verify transaction");
-
-        throw "Error in verify transaction";
-      }
-    }
-
-    try {
-      lastHash = await this.DB.get("lh");
-      const lastBlockData = await this.DB.get(lastHash);
-      const lastBlock = this.deserialize(lastBlockData);
-      lastHeight = lastBlock.Header.Height;
-    } catch (error) {
-      console.error("error", error);
-    }
-
-    let newBlock = this.createBlock(txs, this.LastHash, lastHeight + 1);
+  async checkAfterMint(result) {
+    let newBlock = result.block;
+    let lastHeight = result.lastHeight;
 
     let newlastHeight = 0;
     let newlastHash;
@@ -364,6 +316,34 @@ class Blockchain {
         return "fork";
       }
     }
+  }
+
+  async mineBlock(txs, miningProcess) {
+    let lastHash;
+    let lastHeight = 0;
+
+    for (let i = 0; i < txs.length; i++) {
+      if ((await this.verifyTransaction(txs[i])) != true) {
+        console.error("Error in verify transaction");
+
+        throw "Error in verify transaction";
+      }
+    }
+
+    try {
+      lastHash = await this.DB.get("lh");
+      const lastBlockData = await this.DB.get(lastHash);
+      const lastBlock = this.deserialize(lastBlockData);
+      lastHeight = lastBlock.Header.Height;
+    } catch (error) {
+      console.error("error", error);
+    }
+
+    miningProcess.send({
+      txs,
+      prevHash: this.LastHash,
+      height: lastHeight,
+    });
   }
 
   serialize(block) {
@@ -619,7 +599,10 @@ class Blockchain {
 
         currentHash = block.Header.PrevHash;
 
-        console.log(`block ${block.Header.Height}`, block);
+        console.log(
+          `block ${block.Header.Height}`,
+          JSON.stringify(block, null, 2)
+        );
 
         if (block.Header.PrevHash == "") {
           break;

@@ -122,10 +122,8 @@ class UTXOSet {
   }
 
   async reIndex() {
-    console.log("call hereeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
     const utxos = await this.blockchain.findUTXODB();
 
-    console.log("call here222222222222222");
     await this.deleteByPrefix(this.utxoPrefix);
 
     const batchOps = [];

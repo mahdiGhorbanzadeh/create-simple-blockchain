@@ -57,20 +57,6 @@ class CommandLine {
     await chain.iterate();
   }
 
-  async createBlockChain(address, nodeID) {
-    const chain = new Blockchain(address, nodeID);
-
-    await chain.initBlockchain(address);
-
-    const utxo = new UTXOSet(chain);
-
-    await utxo.reIndex();
-
-    await chain.closeDB();
-
-    console.log("Finished!");
-  }
-
   async getBalanceUser(address, nodeID) {
     const chain = new Blockchain(address, nodeID);
 
@@ -170,16 +156,6 @@ program
   .option("-a, --address <address>", "Set address")
   .action((options) => {
     cli.returnChain(options.address, options.nodeid);
-  });
-
-program
-  .command("createblockchain")
-  .description("create blockchain")
-  .option("-n, --nodeid <nodeid>", "Set node ID")
-  .option("-a, --address <address>", "Set address")
-  .action((options) => {
-    console.log("options", options);
-    cli.createBlockChain(options.address, options.nodeid);
   });
 
 program

@@ -7,6 +7,7 @@ const {
   Transaction,
   coinbaseTx,
 } = require("../transaction");
+const { fork } = require("child_process");
 
 const COMMAND_LENGTH = 12;
 const VERSION = 1;
@@ -17,9 +18,11 @@ let KnownNodes = ["localhost:3000"];
 let blocksInTransit = [];
 let reorganizationHeaders = [];
 let memoryPool = {};
+let miningProcess;
 let reorganizationMode = false;
-let isRunning = false;
+let duringMiningBlock = false;
 let chain;
+let txs = [];
 
 class Addr {
   constructor(addrList = []) {
@@ -251,9 +254,6 @@ async function handleBlock(request) {
   if (blocksInTransit.length > 0) {
     sendGetData(payload.AddrFrom, "block", blocksInTransit.slice(0, 16));
   } else {
-    if (mineAddress) {
-      resumeFunction();
-    }
     reorganizationMode = false;
     const utxo = new UTXOSet(chain);
     await utxo.reIndex();
@@ -273,6 +273,7 @@ async function handleInv(request) {
 
   if (payload.Type === "header") {
     if (!reorganizationMode) {
+      console.log("payload.Items[0].Hash", payload.Items[0].Hash);
       sendGetData(payload.AddrFrom, "block", [payload.Items[0].Hash]);
     }
   }
@@ -452,35 +453,69 @@ async function handleTx(request) {
 }
 
 async function mineTxInterval() {
-  while (true) {
-    if (isRunning) {
+  setInterval(async () => {
+    console.log("-----------------interval called-----------------");
+
+    if (!reorganizationMode && !duringMiningBlock) {
       console.log(
         "---------------------------- start to mine ------------------------"
       );
 
-      await mineTx();
+      duringMiningBlock = true;
 
-      console.log(
-        "---------------------------- end mine ------------------------"
-      );
+      await mineTx();
     }
-    await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait for 2 seconds
+  }, 2000);
+}
+
+async function afterMintBlock(newBlock) {
+  if (newBlock == "fork") {
+    console.log("-----------------------------forked");
+
+    duringMiningBlock = false;
+
+    blocksInTransit = [];
+
+    if (!reorganizationMode) {
+      await sendVersion(KnownNodes[0], chain);
+    }
+
+    console.log(
+      "---------------------------- end mine ------------------------"
+    );
+  } else if (!newBlock) {
+    duringMiningBlock = false;
+    return;
+  }
+
+  console.log("newBlock genrated");
+
+  const utxo = new UTXOSet(chain);
+
+  await utxo.reIndex();
+
+  console.log("New Block mined", txs);
+
+  for (const tx of txs) {
+    console.log("tx for delete from memory pool", tx.ID);
+    const txID = tx.ID;
+    delete memoryPool[txID];
+  }
+
+  duringMiningBlock = false;
+  console.log("---------------------------- end mine ------------------------");
+
+  for (const node of KnownNodes) {
+    if (node !== nodeAddress) {
+      sendInv(node, "header", [
+        { Hash: newBlock.Hash, Header: newBlock.Header },
+      ]);
+    }
   }
 }
 
-function pauseFunction() {
-  isRunning = false;
-
-  console.log("mine paused.");
-}
-
-function resumeFunction() {
-  isRunning = true;
-  console.log("mine resumed.");
-}
-
 async function mineTx() {
-  const txs = [];
+  txs = [];
 
   for (const id in memoryPool) {
     console.log(`tx: ${memoryPool[id].ID}`);
@@ -497,41 +532,15 @@ async function mineTx() {
 
   txs.push(cbTx);
 
-  const newBlock = await chain.mineBlock(txs);
+  miningProcess = fork("./mineWroker.js");
 
-  if (newBlock == "fork") {
-    console.log("-----------------------------forked");
+  miningProcess.on("message", async (result) => {
+    let newBlock = await chain.checkAfterMint(result);
 
-    blocksInTransit = [];
+    afterMintBlock(newBlock);
+  });
 
-    if (!reorganizationMode) {
-      await sendVersion(KnownNodes[0], chain);
-    }
-  } else if (!newBlock) {
-    return;
-  }
-
-  console.log("newBlock genrated");
-
-  const utxo = new UTXOSet(chain);
-
-  await utxo.reIndex();
-
-  console.log("New Block mined");
-
-  for (const tx of txs) {
-    console.log("tx for delete from memory pool", tx.ID);
-    const txID = tx.ID;
-    delete memoryPool[txID];
-  }
-
-  for (const node of KnownNodes) {
-    if (node !== nodeAddress) {
-      sendInv(node, "header", [
-        { Hash: newBlock.Hash, Header: newBlock.Header },
-      ]);
-    }
-  }
+  await chain.mineBlock(txs, miningProcess);
 }
 
 async function handleVersion(request) {
@@ -550,7 +559,10 @@ async function handleVersion(request) {
   if (bestHeight < otherHeight) {
     if (!reorganizationMode) {
       if (mineAddress) {
-        pauseFunction();
+        if (miningProcess) {
+          duringMiningBlock = false;
+          miningProcess.kill();
+        }
       }
       reorganizationMode = true;
       await sendGetHeaders(payload.AddrFrom, "", "");
@@ -649,7 +661,6 @@ const startServer = async (nodeID, minerAddress, address) => {
 
   if (mineAddress) {
     mineTxInterval();
-    resumeFunction();
   }
 };
 
