@@ -11,7 +11,6 @@ const {
 } = require("./transaction");
 
 const { sha256 } = require("bitcoinjs-lib/src/crypto");
-const { afterMintBlock } = require("./network");
 class Blockchain {
   constructor(address, node) {
     this.Node = node;
@@ -379,7 +378,11 @@ class Blockchain {
 
     if (currentHash) {
       while (true) {
+        console.log("currentHash", currentHash);
+
         let block = this.deserialize(await this.DB.get(currentHash));
+
+        console.log("blockblockblockblock", block);
 
         block.Transactions.map((tx) => {
           for (let i = 0; i < tx.TxOutputs.length; i++) {
@@ -530,6 +533,7 @@ class Blockchain {
 
   async signTransaction(tx, privKey) {
     let prevTXs = {};
+    let spentTXOs = {};
 
     for (let i = 0; i < tx.TxInputs.length; i++) {
       let prevTX = await this.findTransaction(tx.TxInputs[i].ID);
@@ -538,6 +542,47 @@ class Blockchain {
     }
 
     sign(tx, privKey, prevTXs);
+  }
+
+  async checkDoubleSpendingTxs(txs) {
+    let removeTx = [];
+
+    let spentTXOs = {};
+
+    for (let i = 0; i < txs.length; i++) {
+      let tx = txs[i];
+
+      let remove = false;
+
+      for (let j = 0; j < tx.TxInputs.length; j++) {
+        let intxId = tx.TxInputs[j].ID;
+
+        if (
+          spentTXOs[intxId] &&
+          spentTXOs[intxId].includes(tx.TxInputs[j].Out)
+        ) {
+          removeTx.push(tx.ID);
+          remove = true;
+          break;
+        }
+      }
+
+      if (remove) {
+        continue;
+      }
+
+      for (let j = 0; j < tx.TxInputs.length; j++) {
+        let intxId = tx.TxInputs[j].ID;
+
+        if (!spentTXOs[intxId]) {
+          spentTXOs[intxId] = [];
+        }
+
+        spentTXOs[intxId].push(tx.TxInputs[j].Out);
+      }
+    }
+
+    return removeTx;
   }
 
   async verifyTransaction(tx) {

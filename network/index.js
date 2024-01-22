@@ -6,8 +6,10 @@ const {
   deserializeTransaction,
   Transaction,
   coinbaseTx,
+  newTransaction,
 } = require("../transaction");
 const { fork } = require("child_process");
+const { Wallet } = require("../wallet");
 
 const COMMAND_LENGTH = 12;
 const VERSION = 1;
@@ -454,14 +456,14 @@ async function handleTx(request) {
 
 async function mineTxInterval() {
   setInterval(async () => {
-    console.log("-----------------interval called-----------------");
-
     if (!reorganizationMode && !duringMiningBlock) {
       console.log(
         "---------------------------- start to mine ------------------------"
       );
 
       duringMiningBlock = true;
+
+      await new Promise((resolve) => setTimeout(resolve, 10000));
 
       await mineTx();
     }
@@ -516,17 +518,20 @@ async function afterMintBlock(newBlock) {
 
 async function mineTx() {
   txs = [];
+  inputs = {};
 
   for (const id in memoryPool) {
     console.log(`tx: ${memoryPool[id].ID}`);
     const tx = memoryPool[id];
 
-    console.log("txxxxxxxxxxxxxxxxxx", tx);
-
     if (await chain.verifyTransaction(tx)) {
       txs.push(tx);
     }
   }
+
+  let removeTxs = await chain.checkDoubleSpendingTxs(txs);
+
+  txs = txs.filter((tx) => !removeTxs.includes(tx.ID));
 
   const cbTx = coinbaseTx(mineAddress, "");
 
@@ -585,6 +590,9 @@ async function handleConnection(data) {
   console.log(`Received ${command} command`);
 
   switch (command) {
+    case "getTxFromCmd":
+      await getTxFromCmd(data);
+      break;
     case "block":
       await handleBlock(data);
       break;
@@ -678,8 +686,48 @@ function nodeIsKnown(addr) {
   return KnownNodes.includes(addr);
 }
 
+async function getTxFromCmd(request) {
+  const commandLength = 12;
+
+  const payload = JSON.parse(request.slice(commandLength).toString());
+
+  let from = payload.from;
+  let to = payload.to;
+  let amount = payload.amount;
+  let nodeID = payload.nodeID;
+
+  if (!Wallet.validateAddress(to)) {
+    console.error("Address is not Valid");
+    process.exit(1);
+  }
+
+  if (!Wallet.validateAddress(from)) {
+    console.error("Address is not Valid");
+    process.exit(1);
+  }
+
+  const utxo = new UTXOSet(chain);
+
+  const tx = await newTransaction(from, to, amount, utxo, nodeID);
+
+  const newPayload = JSON.stringify({
+    Transaction: tx,
+  });
+
+  const newRequest = Buffer.concat([
+    cmdToBytes("handleTx"),
+    Buffer.from(newPayload),
+  ]);
+
+  handleTx(newRequest);
+
+  console.log("Success!");
+}
+
 module.exports = {
   startServer,
   sendTx,
   KnownNodes,
+  sendData,
+  cmdToBytes,
 };

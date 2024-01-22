@@ -1,6 +1,12 @@
 const { program } = require("commander");
 const { Wallet } = require("./wallet");
-const { startServer, KnownNodes, sendTx } = require("./network");
+const {
+  startServer,
+  KnownNodes,
+  sendTx,
+  sendData,
+  cmdToBytes,
+} = require("./network");
 const { Blockchain } = require("./blockchain");
 const { UTXOSet } = require("./utxo");
 const { Wallets } = require("./wallets");
@@ -72,29 +78,19 @@ class CommandLine {
   }
 
   async send(from, to, amount, nodeID, mineNow) {
-    if (!Wallet.validateAddress(to)) {
-      console.error("Address is not Valid");
-      process.exit(1);
-    }
+    const payload = JSON.stringify({
+      from,
+      to,
+      amount,
+      nodeID,
+    });
 
-    if (!Wallet.validateAddress(from)) {
-      console.error("Address is not Valid");
-      process.exit(1);
-    }
+    const request = Buffer.concat([
+      cmdToBytes("getTxFromCmd"),
+      Buffer.from(payload),
+    ]);
 
-    const chain = new Blockchain(from, nodeID);
-
-    await chain.continueBlockchain(address);
-
-    const utxo = new UTXOSet(chain);
-
-    const tx = await newTransaction(from, to, amount, utxo, nodeID);
-
-    await chain.closeDB();
-
-    sendTx(KnownNodes[0], tx);
-
-    console.log("Success!");
+    sendData(`localhost:${nodeID}`, request);
   }
 
   async returnChain(address, nodeID) {
