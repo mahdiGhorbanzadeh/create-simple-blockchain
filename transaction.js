@@ -199,19 +199,19 @@ function canBeUnlocked(output, data) {
 }
 
 async function getBalance(address, UTXOSet, nodeID) {
-  let wallets = new Wallets();
+  // let wallets = new Wallets();
 
-  await wallets.loadFile(nodeID);
+  // await wallets.loadFile(nodeID);
 
-  let res = wallets.getWallet(address);
+  // let res = wallets.getWallet(address);
 
-  let wallet = new Wallet();
+  // let wallet = new Wallet();
 
-  wallet.updateWallet(res.PublicKey, res.PrivateKey);
+  // wallet.updateWallet(res.PublicKey, res.PrivateKey);
 
-  let pubKeyHash = wallet.generatePublicKeyHash();
+  // let pubKeyHash = wallet.generatePublicKeyHash();
 
-  let balance = await UTXOSet.getBalance(pubKeyHash.toString("hex"));
+  let balance = await UTXOSet.getBalance(address);
 
   return balance;
 }

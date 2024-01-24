@@ -48,8 +48,8 @@ class UTXOSet {
     return { accumulated, unspentOuts };
   }
 
-  async getBalance(pubKeyHash) {
-    let utxos = await this.findUTXO(pubKeyHash);
+  async getBalance(address) {
+    let utxos = await this.findUTXO(address);
 
     let amount = 0;
 
@@ -66,7 +66,7 @@ class UTXOSet {
     return amount;
   }
 
-  async findUTXO(pubKeyHash) {
+  async findUTXO(address) {
     let UTXOs = [];
 
     const iterator = this.blockchain.DB.iterator({
@@ -82,7 +82,7 @@ class UTXOSet {
       for (let outIdx = 0; outIdx < outs.length; outIdx++) {
         const out = outs[outIdx];
 
-        if (isLockedWithKey(out, pubKeyHash)) {
+        if (out.Address == address) {
           if (!UTXOs[txID]) {
             UTXOs[txID] = [];
           }
